@@ -2,7 +2,7 @@ package src.Codegen;
 
 public class IRBuilder {
     private int registerCount = 1;
-    private StringBuilder irCode = new StringBuilder();
+    private final StringBuilder irCode = new StringBuilder();
 
     public String nextRegister() {
         return "%" + (registerCount++);

@@ -69,11 +69,31 @@ public abstract class ExprAST {
             if (leftVal == null || rightVal == null) return null;
 
             String resultReg = builder.nextRegister();
-            switch (op) {
+            switch (op) { // TODO add types
                 // nothing for now
+                case '+':
+                    builder.appendLine(resultReg + " = fadd double " + leftVal + ", " + rightVal);
+                    break;
+
+                case '-':
+                    builder.appendLine(resultReg + " fsub double " + leftVal + ", " + rightVal);
+                    break;
+                case '*':
+                    builder.appendLine(resultReg + " = fmul double " + leftVal + ", " + rightVal);
+                    break;
+
+                case '<':
+                    String cmpReg = builder.nextRegister();
+                    builder.appendLine(cmpReg + " = fcmp olt double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to double");
+                    break;
+                default:
+                    System.err.println("Unsopported operation: " + op);
+                    return null;
             }
 
-            return "";
+            return resultReg;
+
         }
     }
 
@@ -120,7 +140,27 @@ public abstract class ExprAST {
 
         @Override
         public String Codegen(IRBuilder builder) {
-            return ""; // nothing for now
+
+            builder.reset();
+
+            StringBuilder functionIR = new StringBuilder();
+            // very funny right? norecurse nounwind alwaysinline after () not working also tailcc
+            // i32 is for the main (fucking standards)
+            functionIR.append("define private dso_local double @").append(Proto.getName()).append("() {\n"); // very clear and simple
+            functionIR.append("entry:\n");
+
+            String retVal = body.Codegen(builder);
+
+            if (retVal != null) {
+                functionIR.append(builder.getIR());
+                functionIR.append(" ret double ").append(retVal).append("\n");
+                functionIR.append("}\n");
+                System.out.println(functionIR.toString());
+                return functionIR.toString();
+            }
+
+            System.out.println("null retval");
+            return null;
         }
     }
 }
