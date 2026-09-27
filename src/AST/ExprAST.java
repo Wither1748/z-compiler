@@ -1,13 +1,17 @@
 package src.AST;
 
-
+import src.Codegen.IRBuilder;
 import java.util.List;
 
 // this probably needs a type field, but we'll figure that out when we'll need a type checker
-public class ExprAST {
+public abstract class ExprAST {
+
+
     ExprAST() {
 
     }
+
+    public abstract  String Codegen(IRBuilder builder);
 
     public static ExprAST LogError(final String err) {
         System.out.printf("Error: %s", err);
@@ -25,6 +29,11 @@ public class ExprAST {
         public NumberExprAST(final double Val) {
             val = Val;
         }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            return String.valueOf(val);
+        }
     }
 
     public static class VariableExprAST extends ExprAST {
@@ -32,6 +41,11 @@ public class ExprAST {
 
         public VariableExprAST(final String Name) {
             name = Name;
+        }
+
+        @Override
+        public String Codegen(IRBuilder builder){
+            return ""; // nothing for now
         }
     }
 
@@ -46,6 +60,21 @@ public class ExprAST {
             left = Left;
             right = Right;
         }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            String leftVal = left.Codegen(builder);
+            String rightVal = right.Codegen(builder);
+
+            if (leftVal == null || rightVal == null) return null;
+
+            String resultReg = builder.nextRegister();
+            switch (op) {
+                // nothing for now
+            }
+
+            return "";
+        }
     }
 
     public static class CallExprAST extends ExprAST {
@@ -56,9 +85,14 @@ public class ExprAST {
             Callee = callee;
             args = Args;
         }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            return ""; // nothing for now
+        }
     }
 
-    public static class PrototypeAST {
+    public static class PrototypeAST extends ExprAST{
         private final String name;
         private final List<String> args;
 
@@ -68,15 +102,25 @@ public class ExprAST {
         }
 
         public final String getName() { return name; }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            return ""; // nothing for now
+        }
     }
 
-    public static class FunctionAST {
+    public static class FunctionAST extends ExprAST {
         private final PrototypeAST Proto;
         private final ExprAST body;
 
         public FunctionAST(final PrototypeAST Proto, final ExprAST body) {
             this.Proto = Proto;
             this.body = body;
+        }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            return ""; // nothing for now
         }
     }
 }
