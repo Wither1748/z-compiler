@@ -130,19 +130,23 @@ public class Parser {
     }
 
     public  ExprAST ParsePrimary() throws IOException {
-        Lexer.Tokens token = Lexer.Tokens.fromValues(curTok);
+        //Lexer.Tokens token = Lexer.Tokens.fromValues(curTok);
 
-        if (token == Lexer.Tokens.IDENTIFIER) {
+        if (curTok == Lexer.Tokens.OPEN_FUNC.value) {
+            Next();
+        }
+
+        if (curTok == Lexer.Tokens.IDENTIFIER.value) {
             return ParseIdentifierExpr();
         }
-        else if (token == Lexer.Tokens.NUMBER) {
+        else if (curTok == Lexer.Tokens.NUMBER.value) {
             return ParseNumberExpr(lex.NumVal);
         }
         else if (curTok == Lexer.Tokens.OPEN_PAR.value) {
             return ParseParenExpr();
         }
         else {
-            return ExprAST.LogError("unknown token when expecting an expression");
+            return ExprAST.LogError("unknown token when expecting an expression" + curTok);
         }
     }
 
@@ -201,11 +205,14 @@ public class Parser {
         Next();
 
         List<String> ArgNames = new ArrayList<>(List.of());
-        while (Next() == Lexer.Tokens.IDENTIFIER.value) {
-            ArgNames.add(lex.IdentifierStr);
+
+        if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
+            while (Next() == Lexer.Tokens.IDENTIFIER.value) {
+                ArgNames.add(lex.IdentifierStr);
+            }
         }
 
-        if (curTok != ')') {
+        if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
             return ExprAST.LogErrorP("Expected ')' in prototype");
         }
 
