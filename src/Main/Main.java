@@ -8,11 +8,12 @@ import src.Codegen.IRBuilder;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-//import java.nio.file.Path;
+import java.nio.file.Path;
+import java.nio.file.Path;
 
 public class Main {
-    public static void main(String[] args) {
-        // Files.readString(Path.of(args[0]));
+    public static void main(String[] args) throws IOException {
+        String zcontent = Files.readString(Path.of(args[0]));
         String zCode = "proc test() { 5 + 3 }"; // it should fail because the main is unreferenced
 
         System.out.println("Compilation");
