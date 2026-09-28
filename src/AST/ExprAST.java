@@ -183,6 +183,11 @@ public abstract class ExprAST {
         public String getType() { return type; }
         public String getName() { return name; }
         public ExprAST getValue() { return value; }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            return ""; // nothing for now
+        }
     }
 }
 
