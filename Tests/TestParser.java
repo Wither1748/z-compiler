@@ -1,9 +1,10 @@
 package Tests;
 
+import org.junit.jupiter.api.Test;
 import src.AST.ExprAST;
 import src.Parser.Parser;
 import src.lexer.Lexer;
-import org.junit.jupiter.api.Test;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
