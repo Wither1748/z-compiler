@@ -72,5 +72,18 @@ public class TestLexer {
         assertEquals(Lexer.Tokens.RET.value, lex.GetTok());
     }
 
+    @Test
+    void testConstantToken() throws IOException {
+        String code = "cn int64 PI -> 314";
+        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
+
+        assertEquals(Lexer.Tokens.CN.value, lex.GetTok());
+        assertEquals(Lexer.Tokens.INT64.value, lex.GetTok());
+        assertEquals(Lexer.Tokens.IDENTIFIER.value, lex.GetTok());
+        assertEquals("PI", lex.IdentifierStr);
+        assertEquals(Lexer.Tokens.ASSIGN.value, lex.GetTok());
+        assertEquals(Lexer.Tokens.NUMBER.value, lex.GetTok());
+        assertEquals(314.0, lex.NumVal);
+    }
     // assignments for now don't work '->' are considered two tokens
 }

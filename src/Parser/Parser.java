@@ -43,6 +43,9 @@ public class Parser {
             else if (token == Lexer.Tokens.FUNC) {
                 HandleDefinition();
             }
+            else if (token == Lexer.Tokens.CN) {
+                HandleConstant();
+            }
             else {
                 ExprAST.LogError("Unknown error (default case)");
                 Next();
@@ -59,6 +62,55 @@ public class Parser {
         else {
             Next();
         }
+    }
+
+    public void HandleConstant() throws IOException {
+        ExprAST.ConstantAST c = ParseConstant();
+        if (c != null) {
+            System.out.println("Parsed a constant: " + c.getName());
+        } else {
+            Next();
+        }
+    }
+
+    public ExprAST.ConstantAST ParseConstant() throws IOException {
+        Next();
+
+        Lexer.Tokens typeTok = Lexer.Tokens.fromValues(curTok);
+        if (typeTok == null || !isTypeToken(typeTok)) {
+            return ExprAST.LogErrorC("Expected type after 'cn'");
+        }
+        String type = typeTok.description;
+        Next();
+
+        if (curTok != Lexer.Tokens.IDENTIFIER.value) {
+            return ExprAST.LogErrorC("Expected constant name");
+        }
+        String name = lex.IdentifierStr;
+        Next();
+
+        if (curTok != Lexer.Tokens.ASSIGN.value && curTok != Lexer.Tokens.SAME.value) {
+            return ExprAST.LogErrorC("Expected '->' or '=' in constant declaration");
+        }
+        Next();
+
+        ExprAST value = ParseExpression();
+        if (value == null) {
+            return null;
+        }
+
+        return new ExprAST.ConstantAST(type, name, value);
+    }
+
+    private boolean isTypeToken(Lexer.Tokens t) {
+        return t == Lexer.Tokens.INT64
+                || t == Lexer.Tokens.INT32
+                || t == Lexer.Tokens.FLOAT32
+                || t == Lexer.Tokens.FLOAT64
+                || t == Lexer.Tokens.STRING
+                || t == Lexer.Tokens.BOOL
+                || t == Lexer.Tokens.UINT32
+                || t == Lexer.Tokens.UINT64;
     }
 
     private  int Next() throws IOException {
@@ -83,7 +135,7 @@ public class Parser {
             return null;
         }
 
-        if (curTok != ')') {
+        if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
             return ExprAST.LogError("expected ')'");
         }
         Next();
@@ -102,7 +154,7 @@ public class Parser {
         Next();
 
         List<ExprAST> args = new ArrayList<>();
-        if (curTok != Lexer.Tokens.OPEN_PAR.value) {
+        if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
             while(true) {
                 ExprAST arg = ParseExpression();
                 if (arg != null) {
