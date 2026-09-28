@@ -23,6 +23,11 @@ public abstract class ExprAST {
         return null;
     }
 
+    public static ConstantAST LogErrorC(final String err) {
+        System.out.printf("Error: %s%n", err);
+        return null;
+    }
+
     public static class NumberExprAST extends ExprAST {
         private final double val;
 
@@ -161,6 +166,27 @@ public abstract class ExprAST {
 
             System.out.println("null retval");
             return null;
+        }
+    }
+
+    public static class ConstantAST extends ExprAST {
+        private final String type;
+        private final String name;
+        private final ExprAST value;
+
+        public ConstantAST(final String type, final String name, final ExprAST value) {
+            this.type = type;
+            this.name = name;
+            this.value = value;
+        }
+
+        public String getType() { return type; }
+        public String getName() { return name; }
+        public ExprAST getValue() { return value; }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            return ""; // nothing for now
         }
     }
 }

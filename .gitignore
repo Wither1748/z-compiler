@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Maven
+target/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*

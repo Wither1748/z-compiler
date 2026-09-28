@@ -40,7 +40,8 @@ public class Lexer {
         PARAMS("|", -29),
         IDENTIFIER("id", -34),
         EOF("eof", -31),
-        SAME("=", -32);
+        SAME("=", -32),
+        CN("cn", -35);
 
         public final String description;
         public final int value;

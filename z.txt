@@ -27,7 +27,7 @@ types: {
 }
 
 
-cn int64
+cn int64 =
 
 if (cond) {
 }
