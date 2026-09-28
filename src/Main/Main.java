@@ -112,7 +112,7 @@ class CompilerCmd implements Callable<Integer> {
 }
 
 public class Main {
-    public static void main(String[] args) throws IOException {
-        int exitCode = new CommandLine(new CompilerCmd()).execute(args);
+    public static void main(String[] args) {
+        new CommandLine(new CompilerCmd()).execute(args);
     }
 }
