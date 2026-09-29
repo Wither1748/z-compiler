@@ -187,9 +187,11 @@ public class TestParser {
     @Test
     void testMainLoopWithConstants() throws IOException {
         // MainLoop 能连续处理多个常量
-        String code = "cn int64 A -> 1\n"
-                + "cn int64 B -> 2\n"
-                + "cn flt64 C -> 3.14\n";
+        String code = """
+                cn int64 A -> 1
+                cn int64 B -> 2
+                cn flt64 C -> 3.14
+                """;
 
         Parser parser = createParser(code);
         assertDoesNotThrow(parser::MainLoop);
@@ -198,8 +200,7 @@ public class TestParser {
     @Test
     void testMainLoopConstantAndFunction() throws IOException {
         // 常量和函数混在一起
-        String code = "cn int64 PI -> 314\n"
-                + "proc foo(int64 x | int64 y) { ret x }\n";
+        String code = "cn int64 PI -> 314\nproc foo(int64 x | int64 y) { ret x }\n";
 
         Parser parser = createParser(code);
         assertDoesNotThrow(parser::MainLoop);
