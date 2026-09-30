@@ -46,6 +46,9 @@ public class Parser {
             else if (token == Lexer.Tokens.CN) {
                 HandleConstant();
             }
+            else if (isTypeToken(token)) {
+                HandleVariable();
+            }
             else {
                 ExprAST.LogError("Unknown error (default case)");
                 Next();
@@ -71,6 +74,43 @@ public class Parser {
         } else {
             Next();
         }
+    }
+
+    public void HandleVariable() throws IOException {
+        ExprAST.VariableExprAST v = ParseVariable();
+        if (v != null){
+            System.out.println("Parsed a variable: " + v.getName());
+        }
+        else {
+            Next();
+        }
+    }
+
+    public ExprAST.VariableExprAST ParseVariable() throws IOException {
+        Lexer.Tokens type = Lexer.Tokens.fromValues(curTok);
+
+        Next();
+
+        if (curTok != Lexer.Tokens.IDENTIFIER.value) {
+            return ExprAST.LogErrorV("Expected name after type");
+        }
+
+        final String name = lex.IdentifierStr;
+        Next();
+
+        if (curTok != Lexer.Tokens.ASSIGN.value) {
+            return new ExprAST.VariableExprAST(name, type.description);
+        }
+
+        Next();
+        if (curTok != Lexer.Tokens.NUMBER.value) {
+            return ExprAST.LogErrorV("Expected expression after assignment operator");
+        }
+
+        final ExprAST.NumberExprAST value = new ExprAST.NumberExprAST(lex.NumVal); // TODO actually fix this and accept also other vars, function calls, etc.
+
+        return new ExprAST.VariableExprAST(name, type.description, value);
+
     }
 
     public ExprAST.ConstantAST ParseConstant() throws IOException {

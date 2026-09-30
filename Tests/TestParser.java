@@ -205,4 +205,24 @@ public class TestParser {
         Parser parser = createParser(code);
         assertDoesNotThrow(parser::MainLoop);
     }
+
+    @Test
+    void testVariableDeclaration() throws IOException {
+        String code = "int32 var";
+        Parser parser = createParser(code);
+        ExprAST.VariableExprAST v = parser.ParseVariable();
+        assertEquals("int32", v.getType());
+        assertEquals("var", v.getName());
+        assertInstanceOf(ExprAST.VariableExprAST.class, v);
+    }
+
+    @Test
+    void testVariableWithAssignment() throws IOException {
+        final String code = "flt32 var = 2";
+        Parser parser = createParser(code);
+        ExprAST.VariableExprAST v = parser.ParseVariable();
+        assertEquals("flt32", v.getType());
+        assertEquals("var", v.getName());
+        assertInstanceOf(ExprAST.VariableExprAST.class, v);
+    }
 }

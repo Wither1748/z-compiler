@@ -11,9 +11,14 @@ public abstract class ExprAST {
 
     }
 
-    public abstract  String Codegen(IRBuilder builder);
+    public abstract String Codegen(IRBuilder builder);
 
     public static ExprAST LogError(final String err) {
+        System.out.printf("Error: %s", err);
+        return null;
+    }
+
+    public static VariableExprAST LogErrorV(final String err){
         System.out.printf("Error: %s", err);
         return null;
     }
@@ -43,14 +48,49 @@ public abstract class ExprAST {
 
     public static class VariableExprAST extends ExprAST {
         private final String name;
+        private final String type;
+        private ExprAST value;
 
-        public VariableExprAST(final String Name) {
+        public VariableExprAST(final String Name, final String type, final ExprAST value) {
             name = Name;
+            this.type = type;
+            this.value = value;
+        }
+
+        public VariableExprAST(final String name, final String type) {
+            this.name = name;
+            this.type = type;
+            value = new NumberExprAST(0);
+        }
+
+        public VariableExprAST(final String idName) {
+            name = idName;
+            type = "double";
+            value = new NumberExprAST(0);
+        }
+
+        public void setValue(final ExprAST value) {
+            if (value instanceof ExprAST.CallExprAST || value instanceof ExprAST.NumberExprAST || value instanceof ExprAST.BinaryExprAST) {
+                this.value = value;
+            }
+        }
+
+        public final String getName() {
+            return name;
+        }
+
+        public final String getType() {
+            return type;
+        }
+
+        public final ExprAST getValue() {
+            return value;
         }
 
         @Override
         public String Codegen(IRBuilder builder){
-            return ""; // nothing for now
+            builder.appendLine("%" + name + " = alloca double");
+            return builder.toString();
         }
     }
 
@@ -160,7 +200,7 @@ public abstract class ExprAST {
                 functionIR.append(builder.getIR());
                 functionIR.append(" ret double ").append(retVal).append("\n");
                 functionIR.append("}\n");
-                System.out.println(functionIR.toString());
+                System.out.println(functionIR);
                 return functionIR.toString();
             }
 

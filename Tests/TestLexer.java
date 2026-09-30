@@ -4,6 +4,8 @@ import src.lexer.Lexer;
 import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TestLexer {
@@ -84,6 +86,17 @@ public class TestLexer {
         assertEquals(Lexer.Tokens.ASSIGN.value, lex.GetTok());
         assertEquals(Lexer.Tokens.NUMBER.value, lex.GetTok());
         assertEquals(314.0, lex.NumVal);
+    }
+
+    @Test
+    void testVariableAssignment() throws IOException {
+        final String code = "int32 var -> 30";
+        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes(StandardCharsets.UTF_8)));
+
+        assertEquals(Lexer.Tokens.INT32.value, lex.GetTok());
+        assertEquals(Lexer.Tokens.IDENTIFIER.value, lex.GetTok());
+        assertEquals(Lexer.Tokens.ASSIGN.value, lex.GetTok());
+        assertEquals(Lexer.Tokens.NUMBER.value, lex.GetTok());
     }
     // assignments for now don't work '->' are considered two tokens
 }
