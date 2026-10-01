@@ -22,6 +22,8 @@ public class Parser {
         BinOpPrecedence.put(Lexer.Tokens.MORE.value, 10);
     }
 
+    public static HashMap<String, Integer> functionCount = new HashMap<>();
+
 
     public Parser(Lexer lex) throws IOException {
         this.lex = lex;
@@ -104,10 +106,25 @@ public class Parser {
 
         Next();
         if (curTok != Lexer.Tokens.NUMBER.value) {
-            return ExprAST.LogErrorV("Expected expression after assignment operator");
+            if (curTok != Lexer.Tokens.IDENTIFIER.value) {
+                return ExprAST.LogErrorV("Expected expression after assignment operator");
+            }
+
+            final String IdentifierName = lex.IdentifierStr;
+
+            Next();
+            if (curTok == Lexer.Tokens.OPEN_PAR.value) {
+                Next();
+
+                if (curTok == Lexer.Tokens.CLOSE_PAR.value) {
+                    return new ExprAST.VariableExprAST(name, type.description, IdentifierName);
+                }
+            }
+
+            return new ExprAST.VariableExprAST(name, type.description, IdentifierName);
         }
 
-        final ExprAST.NumberExprAST value = new ExprAST.NumberExprAST(lex.NumVal); // TODO actually fix this and accept also other vars, function calls, etc.
+        final ExprAST.NumberExprAST value = new ExprAST.NumberExprAST(lex.NumVal);
 
         return new ExprAST.VariableExprAST(name, type.description, value);
 
@@ -237,6 +254,10 @@ public class Parser {
         else if (curTok == Lexer.Tokens.OPEN_PAR.value) {
             return ParseParenExpr();
         }
+        else if (curTok == Lexer.Tokens.RET.value) {
+            System.out.println("here");
+            return ParseRet();
+        }
         else {
             return ExprAST.LogError("unknown token when expecting an expression" + curTok);
         }
@@ -246,6 +267,16 @@ public class Parser {
         Integer TokPrec = BinOpPrecedence.get(curTok);
         if (TokPrec == null || TokPrec <= 0) return -1;
         return TokPrec;
+    }
+
+    public ExprAST ParseRet() throws IOException {
+        Next();
+        ExprAST rightSide = ParsePrimary();
+        if (rightSide == null) {
+            return new ExprAST.RetAST(new ExprAST.NumberExprAST(281)); // aura
+        }
+
+        return new ExprAST.RetAST(rightSide);
     }
 
     public  ExprAST ParseExpression() throws IOException {
@@ -309,6 +340,8 @@ public class Parser {
         }
 
         Next();
+
+        functionCount.put(FnName, 0);
 
         return new ExprAST.PrototypeAST(FnName, ArgNames);
     }

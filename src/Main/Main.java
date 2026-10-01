@@ -54,6 +54,7 @@ class CompilerCmd implements Callable<Integer> {
                 System.exit(1);
             }
 
+            System.out.println(llvmIR);
             File irFile = new File(outPath);
             Files.writeString(irFile.toPath(), llvmIR);
             System.out.println("File IR built successfully: " + outPath);

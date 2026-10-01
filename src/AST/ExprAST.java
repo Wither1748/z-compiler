@@ -1,7 +1,10 @@
 package src.AST;
 
 import src.Codegen.IRBuilder;
+import src.Parser.*;
+
 import java.util.List;
+import java.util.Objects;
 
 // this probably needs a type field, but we'll figure that out when we'll need a type checker
 public abstract class ExprAST {
@@ -50,23 +53,44 @@ public abstract class ExprAST {
         private final String name;
         private final String type;
         private ExprAST value;
+        private boolean flagForVars = false;
+        private String Identifier;
 
         public VariableExprAST(final String Name, final String type, final ExprAST value) {
             name = Name;
             this.type = type;
             this.value = value;
+            this.Identifier = "";
         }
 
         public VariableExprAST(final String name, final String type) {
             this.name = name;
             this.type = type;
-            value = new NumberExprAST(0);
+            value = new NumberExprAST(0); // TODO add types different defaults
         }
 
         public VariableExprAST(final String idName) {
             name = idName;
             type = "double";
             value = new NumberExprAST(0);
+        }
+
+        public VariableExprAST(final String name, final String type, final String varName) {
+            this.name = name;
+            this.type = type;
+            this.value = checkIfVarOrFunction(varName);
+        }
+
+        public NumberExprAST checkIfVarOrFunction(final String name) {
+            final Integer ret = Parser.functionCount.get(name);
+            Identifier = name;
+            if (ret == null) { // it must be a variable
+                flagForVars = true;
+                return null;
+            }
+
+            flagForVars = false;
+            return null;
         }
 
         public void setValue(final ExprAST value) {
@@ -90,6 +114,9 @@ public abstract class ExprAST {
         @Override
         public String Codegen(IRBuilder builder){
             builder.appendLine("%" + name + " = alloca double");
+            if (!Objects.equals(Identifier, "") && !flagForVars) {
+                builder.appendLine(builder.nextRegister() + " = call " + getType() + "@" + Identifier + "(");
+            }
             return builder.toString();
         }
     }
@@ -121,7 +148,7 @@ public abstract class ExprAST {
                     break;
 
                 case '-':
-                    builder.appendLine(resultReg + " fsub double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " =  fsub double " + leftVal + ", " + rightVal);
                     break;
                 case '*':
                     builder.appendLine(resultReg + " = fmul double " + leftVal + ", " + rightVal);
@@ -174,6 +201,24 @@ public abstract class ExprAST {
         }
     }
 
+    public static class RetAST extends ExprAST {
+        private final ExprAST statement;
+
+        public RetAST(final ExprAST statement) {
+            this.statement = statement;
+        }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            if (statement instanceof NumberExprAST) {
+                builder.appendLine("ret i32 " + statement.Codegen(builder));
+                return builder.getIR();
+            }
+
+            return ""; // nothing for now
+        }
+    }
+
     public static class FunctionAST extends ExprAST {
         private final PrototypeAST Proto;
         private final ExprAST body;
@@ -189,18 +234,27 @@ public abstract class ExprAST {
             builder.reset();
 
             StringBuilder functionIR = new StringBuilder();
+            boolean isMain = Proto.getName().equals("main");
             // very funny right? norecurse nounwind alwaysinline after () not working also tailcc
             // i32 is for the main (fucking standards)
-            functionIR.append("define private dso_local double @").append(Proto.getName()).append("() {\n"); // very clear and simple
+            String retType = isMain ? "i32" : "double";
+            String linkage = isMain ? "dso_local" : "private dso_local";
+
+            functionIR.append("define ").append(linkage).append(" ").append(retType).append(" @").append(Proto.getName()).append("() {\n");
             functionIR.append("entry:\n");
 
             String retVal = body.Codegen(builder);
 
             if (retVal != null) {
                 functionIR.append(builder.getIR());
-                functionIR.append(" ret double ").append(retVal).append("\n");
+                if (isMain) {
+                    String intReg = builder.nextRegister();
+                    functionIR.append("  ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
+                    retVal = intReg;
+                }
+
+                functionIR.append("  ret ").append(retType).append(" ").append(retVal).append("\n");
                 functionIR.append("}\n");
-                System.out.println(functionIR);
                 return functionIR.toString();
             }
 
