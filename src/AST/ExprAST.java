@@ -1,38 +1,36 @@
 package src.AST;
 
 import src.Codegen.IRBuilder;
-import src.Parser.*;
+import src.Codegen.SymbolTable;
+import src.Parser.Types;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
-// this probably needs a type field, but we'll figure that out when we'll need a type checker
 public abstract class ExprAST {
+    protected static SymbolTable symbolTable = new SymbolTable();
 
-
-    ExprAST() {
-
-    }
+    ExprAST() {}
 
     public abstract String Codegen(IRBuilder builder);
 
     public static ExprAST LogError(final String err) {
-        System.out.printf("Error: %s", err);
+        System.err.printf("Error: %s%n", err);
         return null;
     }
 
     public static VariableExprAST LogErrorV(final String err){
-        System.out.printf("Error: %s", err);
+        System.err.printf("Error: %s%n", err);
         return null;
     }
 
     public static PrototypeAST LogErrorP(final String err) {
-        System.out.printf("Error: %s",err);
+        System.err.printf("Error: %s%n", err);
         return null;
     }
 
     public static ConstantAST LogErrorC(final String err) {
-        System.out.printf("Error: %s%n", err);
+        System.err.printf("Error: %s%n", err);
         return null;
     }
 
@@ -42,6 +40,9 @@ public abstract class ExprAST {
         public NumberExprAST(final double Val) {
             val = Val;
         }
+
+        public double getVal() { return val; }
+        public int getIntVal() { return (int) val; }
 
         @Override
         public String Codegen(IRBuilder builder) {
@@ -53,71 +54,55 @@ public abstract class ExprAST {
         private final String name;
         private final String type;
         private ExprAST value;
-        private boolean flagForVars = false;
-        private String Identifier;
+        private SymbolTable.SymbolInfo info;
 
-        public VariableExprAST(final String Name, final String type, final ExprAST value) {
-            name = Name;
+        public VariableExprAST(final String name, final String type, final ExprAST value) {
+            this.name = name;
             this.type = type;
             this.value = value;
-            this.Identifier = "";
+            this.info = new SymbolTable.SymbolInfo(name, Types.getLlvmType(type), "%" + name, false);
+            symbolTable.define(name, this.info);
         }
 
         public VariableExprAST(final String name, final String type) {
             this.name = name;
             this.type = type;
-            value = new NumberExprAST(0); // TODO add types different defaults
+            this.value = new NumberExprAST(Double.parseDouble(Types.getDefaultValue(type)));
+            this.info = new SymbolTable.SymbolInfo(name, Types.getLlvmType(type), "%" + name, false);
+            final boolean result = symbolTable.define(name, this.info);
+            if (!result) {
+                ExprAST.LogErrorV("Shadowing or redeclaration of variable in current scope: " + name);
+            }
         }
 
         public VariableExprAST(final String idName) {
-            name = idName;
-            type = "double";
-            value = new NumberExprAST(0);
+            this.name = idName;
+            this.type = "flt64";
+            this.value = null;
         }
 
-        public VariableExprAST(final String name, final String type, final String varName) {
-            this.name = name;
-            this.type = type;
-            this.value = checkIfVarOrFunction(varName);
-        }
-
-        public NumberExprAST checkIfVarOrFunction(final String name) {
-            final Integer ret = Parser.functionCount.get(name);
-            Identifier = name;
-            if (ret == null) { // it must be a variable
-                flagForVars = true;
-                return null;
-            }
-
-            flagForVars = false;
-            return null;
-        }
-
-        public void setValue(final ExprAST value) {
-            if (value instanceof ExprAST.CallExprAST || value instanceof ExprAST.NumberExprAST || value instanceof ExprAST.BinaryExprAST) {
-                this.value = value;
-            }
-        }
-
-        public final String getName() {
-            return name;
-        }
-
-        public final String getType() {
-            return type;
-        }
-
-        public final ExprAST getValue() {
-            return value;
-        }
+        public final String getName() { return name; }
+        public final String getType() { return type; }
+        public final ExprAST getValue() { return value; }
 
         @Override
-        public String Codegen(IRBuilder builder){
-            builder.appendLine("%" + name + " = alloca double");
-            if (!Objects.equals(Identifier, "") && !flagForVars) {
-                builder.appendLine(builder.nextRegister() + " = call " + getType() + "@" + Identifier + "(");
+        public String Codegen(IRBuilder builder) {
+            SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
+            if (existing != null) {
+                // reference to an existing variable
+                return builder.emitLoad(existing.getLlvmType(), existing.getPointerReg());
             }
-            return "%" + name;
+
+            // definining a new var
+            String llvmType = info != null ? info.getLlvmType() : "double";
+            String ptr = builder.emitAlloca(name, llvmType);
+            if (value != null) {
+                String valReg = value.Codegen(builder);
+                if (valReg != null) {
+                    builder.emitStore(valReg, llvmType, ptr);
+                }
+            }
+            return ptr;
         }
     }
 
@@ -125,7 +110,6 @@ public abstract class ExprAST {
         private final char op;
         private final ExprAST left;
         private final ExprAST right;
-
 
         public BinaryExprAST(final char Op, final ExprAST Left, final ExprAST Right) {
             op = Op;
@@ -141,50 +125,56 @@ public abstract class ExprAST {
             if (leftVal == null || rightVal == null) return null;
 
             String resultReg = builder.nextRegister();
-            switch (op) { // TODO add types
-                // nothing for now
+            switch (op) {
                 case '+':
                     builder.appendLine(resultReg + " = fadd double " + leftVal + ", " + rightVal);
                     break;
-
                 case '-':
-                    builder.appendLine(resultReg + " =  fsub double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = fsub double " + leftVal + ", " + rightVal);
                     break;
                 case '*':
                     builder.appendLine(resultReg + " = fmul double " + leftVal + ", " + rightVal);
                     break;
-
+                case '/':
+                    builder.appendLine(resultReg + " = fdiv double " + leftVal + ", " + rightVal);
+                    break;
                 case '<':
                     String cmpReg = builder.nextRegister();
                     builder.appendLine(cmpReg + " = fcmp olt double " + leftVal + ", " + rightVal);
                     builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to double");
                     break;
                 default:
-                    System.err.println("Unsopported operation: " + op);
+                    System.err.println("Unsupported operation: " + op);
                     return null;
             }
-
             return resultReg;
-
         }
     }
 
     public static class CallExprAST extends ExprAST {
-        private final String Callee;
+        private final String callee;
         private final List<ExprAST> args;
 
-        public CallExprAST(final String callee, final List<ExprAST> Args) {
-            Callee = callee;
-            args = Args;
+        public CallExprAST(final String callee, final List<ExprAST> args) {
+            this.callee = callee;
+            this.args = args;
         }
 
         @Override
         public String Codegen(IRBuilder builder) {
-            return ""; // nothing for now
+            List<String> argRegs = new ArrayList<>();
+            for (ExprAST arg : args) {
+                String argReg = arg.Codegen(builder);
+                if (argReg == null) return null;
+                argRegs.add("double " + argReg);
+            }
+            String resultReg = builder.nextRegister();
+            builder.appendLine(resultReg + " = call double @" + callee + "(" + String.join(", ", argRegs) + ")");
+            return resultReg;
         }
     }
 
-    public static class PrototypeAST extends ExprAST{
+    public static class PrototypeAST extends ExprAST {
         private final String name;
         private final List<String> args;
 
@@ -197,7 +187,7 @@ public abstract class ExprAST {
 
         @Override
         public String Codegen(IRBuilder builder) {
-            return ""; // nothing for now
+            return "";
         }
     }
 
@@ -208,9 +198,7 @@ public abstract class ExprAST {
             this.statement = statement;
         }
 
-        public ExprAST getStatement() {
-            return statement;
-        }
+        public ExprAST getStatement() { return statement; }
 
         @Override
         public String Codegen(IRBuilder builder) {
@@ -228,9 +216,7 @@ public abstract class ExprAST {
             this.statements = statements;
         }
 
-        public List<ExprAST> getStatements() {
-            return statements;
-        }
+        public List<ExprAST> getStatements() { return statements; }
 
         @Override
         public String Codegen(IRBuilder builder) {
@@ -243,27 +229,25 @@ public abstract class ExprAST {
     }
 
     public static class FunctionAST extends ExprAST {
-        private final PrototypeAST Proto;
+        private final PrototypeAST proto;
         private final ExprAST body;
 
-        public FunctionAST(final PrototypeAST Proto, final ExprAST body) {
-            this.Proto = Proto;
+        public FunctionAST(final PrototypeAST proto, final ExprAST body) {
+            this.proto = proto;
             this.body = body;
         }
 
         @Override
         public String Codegen(IRBuilder builder) {
-
             builder.reset();
+            symbolTable.enterScope();
 
             StringBuilder functionIR = new StringBuilder();
-            boolean isMain = Proto.getName().equals("main");
-            // very funny right? norecurse nounwind alwaysinline after () not working also tailcc
-            // i32 is for the main (fucking standards)
+            boolean isMain = proto.getName().equals("main");
             String retType = isMain ? "i32" : "double";
             String linkage = isMain ? "dso_local" : "private dso_local";
 
-            functionIR.append("define ").append(linkage).append(" ").append(retType).append(" @").append(Proto.getName()).append("() {\n");
+            functionIR.append("define ").append(linkage).append(" ").append(retType).append(" @").append(proto.getName()).append("() {\n");
             functionIR.append("entry:\n");
 
             String retVal = body.Codegen(builder);
@@ -273,16 +257,17 @@ public abstract class ExprAST {
                 if (isMain) {
                     String intReg = builder.nextRegister();
                     functionIR.append("  ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
-                    retVal = intReg;
-                    functionIR.append("  ret ").append(retType).append(" ").append(retVal).append("\n");
+                    functionIR.append("  ret i32 ").append(intReg).append("\n");
                 } else {
-                    functionIR.append(" ret ").append(retType).append(" ").append(retVal).append("\n");
+                    functionIR.append(" ret double ").append(retVal).append("\n");
                 }
                 functionIR.append("}\n");
+                symbolTable.exitScope();
                 return functionIR.toString();
             }
 
-            System.out.println("null retval");
+            symbolTable.exitScope();
+            System.err.println("Null retval in function " + proto.getName());
             return null;
         }
     }
@@ -304,12 +289,10 @@ public abstract class ExprAST {
 
         @Override
         public String Codegen(IRBuilder builder) {
-            return ""; // nothing for now
+            if (value != null) {
+                return value.Codegen(builder);
+            }
+            return "";
         }
     }
 }
-
-
-
-
-

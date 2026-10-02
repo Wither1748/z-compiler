@@ -53,13 +53,6 @@ public class TestCodeGen {
     @Test
     public void testSimpleFunction() throws IOException {
         final String code = "proc test() {\n 3+4 \n }";
-        //createFile(code, "test.z");
-
-        //String[] args = new String[1];
-        //args[0] = "test.z";
-        //Main.main(args);
-
-        //final String result = readFile("output.ll");
 
         String llvmIR = codeGen(code);
         final String expected = "define private dso_local double @test() {\nentry:\n %1 = fadd double 3.0, 4.0\n ret double %1\n}\n";
@@ -84,4 +77,13 @@ public class TestCodeGen {
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
+
+    /*@Test
+    public void testVarsWithoutAssignment() throws IOException {
+        final String code = "proc main() {\n int32 var \n ret 0 \n }";
+        String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n %1 = load i32, ptr %var\n ret i32 0\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }*/ // TODO fix this
 }

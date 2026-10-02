@@ -17,17 +17,17 @@ import java.util.concurrent.Callable;
 
 @Command(name = "compiler", mixinStandardHelpOptions = true, version = "1", description = "Compiler z-code")
 class CompilerCmd implements Callable<Integer> {
-    @CommandLine.Parameters(index = "0", description = "Source to file to be compiled")
+    @CommandLine.Parameters(index = "0", description = "Source file to be compiled")
     private File sourceFile;
 
-    @CommandLine.Option(names = {"-o", "--out"}, description = "out directory")
+    @CommandLine.Option(names = {"-o", "--out"}, description = "Output path")
     private String outPath;
 
     @Override
     public Integer call() throws Exception {
         String zCode = Files.readString(sourceFile.toPath());
 
-        System.out.println("Compilation");
+        System.out.println("Starting compilation...");
 
         try {
             InputStream input = new ByteArrayInputStream(zCode.getBytes(StandardCharsets.UTF_8));
@@ -52,7 +52,7 @@ class CompilerCmd implements Callable<Integer> {
 
             if (mainFunction == null) {
                 System.err.println("Syntax error");
-                System.exit(1);
+                return 1;
             }
 
             IRBuilder builder = new IRBuilder();
@@ -60,7 +60,7 @@ class CompilerCmd implements Callable<Integer> {
 
             if (llvmIR == null) {
                 System.err.println("Error building the IR");
-                System.exit(1);
+                return 1;
             }
 
             System.out.println(llvmIR);
@@ -79,7 +79,7 @@ class CompilerCmd implements Callable<Integer> {
     }
 
     private static void compileToBinary(String llFilePath, String outputBinaryName) {
-        System.out.println("Clang launching...");
+        System.out.println("Launching Clang...");
 
         ProcessBuilder processBuilder = createProcessBuilder(llFilePath, outputBinaryName);
 
@@ -88,12 +88,12 @@ class CompilerCmd implements Callable<Integer> {
             int exitCode = process.waitFor();
 
             if (exitCode == 0) {
-                System.out.println("✅ Executable created: ./" + outputBinaryName);
+                System.out.println("Executable created: ./" + outputBinaryName);
             } else {
-                System.err.println("❌ Error during compilation. Exit code: " + exitCode);
+                System.err.println("Error during compilation. Exit code: " + exitCode);
             }
         } catch (IOException | InterruptedException e) {
-            System.err.println("Fail to launch Clang");
+            System.err.println("Failed to launch Clang");
             e.printStackTrace();
         }
     }
@@ -104,9 +104,7 @@ class CompilerCmd implements Callable<Integer> {
                 "-O3",
                 "-flto",
                 "-march=native",
-                "-fprofile-instr-generate", // next -fprofile-instr-use if PGO
                 "-funroll-loops",
-                //"-fprefetch-loop-arrays", for some reason it's unsupported
                 "-fno-rtti",
                 "-fno-exceptions",
                 "-mtune=native",
@@ -118,7 +116,6 @@ class CompilerCmd implements Callable<Integer> {
         processBuilder.inheritIO();
         return processBuilder;
     }
-
 }
 
 public class Main {
