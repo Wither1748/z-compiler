@@ -67,4 +67,21 @@ public class TestCodeGen {
         assertEquals(expected, llvmIR);
     }
 
+    @Test
+    public void testFunctionWithReturnStatement() throws IOException {
+        final String code = "proc main() {\n ret 40 + 32 \n }";
+        String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %1 = fadd double 40.0, 32.0\n  %2 = fptosi double %1 to i32\n  ret i32 %2\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
+
+    @Test
+    public void testFunctionWithReturnNonMain() throws IOException {
+        final String code = "proc foo() {\n ret 10 * 2 \n }";
+        String llvmIR = codeGen(code);
+        final String expected = "define private dso_local double @foo() {\nentry:\n %1 = fmul double 10.0, 2.0\n ret double %1\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
 }

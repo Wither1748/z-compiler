@@ -117,7 +117,7 @@ public abstract class ExprAST {
             if (!Objects.equals(Identifier, "") && !flagForVars) {
                 builder.appendLine(builder.nextRegister() + " = call " + getType() + "@" + Identifier + "(");
             }
-            return builder.toString();
+            return "%" + name;
         }
     }
 
@@ -208,14 +208,37 @@ public abstract class ExprAST {
             this.statement = statement;
         }
 
+        public ExprAST getStatement() {
+            return statement;
+        }
+
         @Override
         public String Codegen(IRBuilder builder) {
-            if (statement instanceof NumberExprAST) {
-                builder.appendLine("ret i32 " + statement.Codegen(builder));
-                return builder.getIR();
+            if (statement != null) {
+                return statement.Codegen(builder);
             }
+            return null;
+        }
+    }
 
-            return ""; // nothing for now
+    public static class BlockAST extends ExprAST {
+        private final List<ExprAST> statements;
+
+        public BlockAST(final List<ExprAST> statements) {
+            this.statements = statements;
+        }
+
+        public List<ExprAST> getStatements() {
+            return statements;
+        }
+
+        @Override
+        public String Codegen(IRBuilder builder) {
+            String lastVal = null;
+            for (ExprAST stmt : statements) {
+                lastVal = stmt.Codegen(builder);
+            }
+            return lastVal;
         }
     }
 
@@ -251,9 +274,10 @@ public abstract class ExprAST {
                     String intReg = builder.nextRegister();
                     functionIR.append("  ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
                     retVal = intReg;
+                    functionIR.append("  ret ").append(retType).append(" ").append(retVal).append("\n");
+                } else {
+                    functionIR.append(" ret ").append(retType).append(" ").append(retVal).append("\n");
                 }
-
-                functionIR.append("  ret ").append(retType).append(" ").append(retVal).append("\n");
                 functionIR.append("}\n");
                 return functionIR.toString();
             }

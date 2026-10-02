@@ -255,7 +255,6 @@ public class Parser {
             return ParseParenExpr();
         }
         else if (curTok == Lexer.Tokens.RET.value) {
-            System.out.println("here");
             return ParseRet();
         }
         else {
@@ -271,12 +270,28 @@ public class Parser {
 
     public ExprAST ParseRet() throws IOException {
         Next();
-        ExprAST rightSide = ParsePrimary();
+        ExprAST rightSide = ParseExpression();
         if (rightSide == null) {
             return new ExprAST.RetAST(new ExprAST.NumberExprAST(281)); // aura
         }
 
         return new ExprAST.RetAST(rightSide);
+    }
+
+    public ExprAST ParseStatement() throws IOException {
+        Lexer.Tokens token = Lexer.Tokens.fromValues(curTok);
+        if (token == Lexer.Tokens.RET) {
+            return ParseRet();
+        }
+        else if (isTypeToken(token)) {
+            return ParseVariable();
+        }
+        else if (token == Lexer.Tokens.CN) {
+            return ParseConstant();
+        }
+        else {
+            return ParseExpression();
+        }
     }
 
     public  ExprAST ParseExpression() throws IOException {
@@ -353,12 +368,34 @@ public class Parser {
             return null;
         }
 
-        ExprAST E = ParseExpression();
-        if (E != null) {
-            return new ExprAST.FunctionAST(Proto, E);
+        if (curTok == Lexer.Tokens.OPEN_FUNC.value) {
+            Next();
         }
 
-        return null;
+        List<ExprAST> bodyStatements = new ArrayList<>();
+        while (curTok != Lexer.Tokens.CLOSE_FUNC.value && curTok != Lexer.Tokens.EOF.value) {
+            if (curTok == ';') {
+                Next();
+                continue;
+            }
+            ExprAST stmt = ParseStatement();
+            if (stmt != null) {
+                bodyStatements.add(stmt);
+            } else {
+                break;
+            }
+        }
+
+        if (curTok == Lexer.Tokens.CLOSE_FUNC.value) {
+            Next();
+        }
+
+        if (bodyStatements.isEmpty()) {
+            return null;
+        }
+
+        ExprAST body = bodyStatements.size() == 1 ? bodyStatements.get(0) : new ExprAST.BlockAST(bodyStatements);
+        return new ExprAST.FunctionAST(Proto, body);
     }
 
     // TODO add import parsing

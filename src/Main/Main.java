@@ -32,8 +32,17 @@ class CompilerCmd implements Callable<Integer> {
         try {
             InputStream input = new ByteArrayInputStream(zCode.getBytes(StandardCharsets.UTF_8));
 
+            String llFilePath;
+            String binaryName;
             if (outPath == null) {
-                outPath = "output.ll";
+                llFilePath = "output.ll";
+                binaryName = "output";
+            } else if (outPath.endsWith(".ll")) {
+                llFilePath = outPath;
+                binaryName = outPath.substring(0, outPath.length() - 3);
+            } else {
+                llFilePath = outPath + ".ll";
+                binaryName = outPath;
             }
 
             Lexer lexer = new Lexer(input);
@@ -55,11 +64,11 @@ class CompilerCmd implements Callable<Integer> {
             }
 
             System.out.println(llvmIR);
-            File irFile = new File(outPath);
+            File irFile = new File(llFilePath);
             Files.writeString(irFile.toPath(), llvmIR);
-            System.out.println("File IR built successfully: " + outPath);
+            System.out.println("File IR built successfully: " + llFilePath);
 
-            compileToBinary(irFile.getAbsolutePath(), outPath);
+            compileToBinary(irFile.getAbsolutePath(), binaryName);
 
             return 0;
 
