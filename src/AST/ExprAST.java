@@ -127,7 +127,6 @@ public abstract class ExprAST {
             this.type = type;
             this.value = value;
             this.info = new SymbolTable.SymbolInfo(name, Types.getLlvmType(type), "%" + name, false);
-            symbolTable.define(name, this.info);
         }
 
         /**
@@ -140,10 +139,6 @@ public abstract class ExprAST {
             this.type = type;
             this.value = new NumberExprAST(Double.parseDouble(Types.getDefaultValue(type)));
             this.info = new SymbolTable.SymbolInfo(name, Types.getLlvmType(type), "%" + name, false);
-            final boolean result = symbolTable.define(name, this.info);
-            if (!result) {
-                ExprAST.LogErrorV("Shadowing or redeclaration of variable in current scope: " + name);
-            }
         }
 
         /**
@@ -178,10 +173,20 @@ public abstract class ExprAST {
             }
 
             // definining a new var
+            final boolean result = symbolTable.define(name, this.info);
+            if (!result) {
+                ExprAST.LogErrorV("Shadowing or redeclaration of variable in current scope: " + name);
+            }
             final String llvmType = info != null ? info.getLlvmType() : "double";
             final String ptr = builder.emitAlloca(name, llvmType);
             if (value != null) {
-                final String valReg = value.Codegen(builder);
+                String valReg;
+                if (value instanceof NumberExprAST && !llvmType.equals("double") && !llvmType.equals("float")) {
+                    // Convert default value to integer literal for integer types
+                    valReg = String.valueOf(((NumberExprAST) value).getIntVal());
+                } else {
+                    valReg = value.Codegen(builder);
+                }
                 if (valReg != null) {
                     builder.emitStore(valReg, llvmType, ptr);
                 }
@@ -451,9 +456,22 @@ public abstract class ExprAST {
             if (retVal != null) {
                 functionIR.append(builder.getIR());
                 if (isMain) {
-                    final String intReg = builder.nextRegister();
-                    functionIR.append("  ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
-                    functionIR.append("  ret i32 ").append(intReg).append("\n");
+                    // Check if retVal is an integer literal (including decimal representations like 0.0)
+                    if (retVal.matches("-?\\d+\\.0+")) {
+                        functionIR.append(" ret i32 ").append(retVal.substring(0, retVal.indexOf('.'))).append("\n");
+                    } else if (retVal.matches("-?\\d+")) {
+                        functionIR.append("  ret i32 ").append(retVal).append("\n");
+                    } else {
+                        // Check if the register is already i32 type
+                        final String regType = builder.getRegisterType(retVal);
+                        if (regType != null && regType.equals("i32")) {
+                            functionIR.append(" ret i32 ").append(retVal).append("\n");
+                        } else {
+                            final String intReg = builder.nextRegister();
+                            functionIR.append(" ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
+                            functionIR.append(" ret i32 ").append(intReg).append("\n");
+                        }
+                    }
                 } else {
                     functionIR.append(" ret double ").append(retVal).append("\n");
                 }
