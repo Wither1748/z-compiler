@@ -147,6 +147,8 @@ public class TestCodeGen {
         final String expected = "define dso_local i32 @main() {\nentry:\n %const = alloca i32\n store i32 3, ptr %const\n %floatConst = alloca float\n store float 1, ptr %floatConst\n %1 = load i32, ptr %const\n ret i32 %1\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
+
+    @Test
     public void testFunctionCallInsideMain() throws IOException {
         final String code = "proc main() {\n foo() \n ret 0 \n }";
         final String llvmIR = codeGen(code);
