@@ -3,8 +3,8 @@ package src.Parser;
 import java.util.HashMap;
 
 public class Types {
-    protected static HashMap<String, String> types = new HashMap<>();
-    protected static HashMap<String, String> defaultValues = new HashMap<>();
+    protected static final HashMap<String, String> types = new HashMap<>();
+    protected static final HashMap<String, String> defaultValues = new HashMap<>();
 
     static {
         // Z types to LLVM types

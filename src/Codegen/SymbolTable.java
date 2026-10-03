@@ -2,10 +2,6 @@ package src.Codegen;
 
 import java.util.*;
 
-/**
- * Scoped Symbol Table per la gestione di variabili, costanti e tipi.
- * Scaffolding architetturale per la Milestone 1 (Issue #37 & #38).
- */
 public class SymbolTable {
 
     public static class SymbolInfo {
@@ -25,13 +21,13 @@ public class SymbolTable {
             this.callCount = 0;
         }
 
-        public String getName() { return name; }
-        public String getLlvmType() { return llvmType; }
-        public String getPointerReg() { return pointerReg; }
-        public boolean isConstant() { return isConstant; }
-        public boolean isUsed() { return isUsed; }
+        public final String getName() { return name; }
+        public final String getLlvmType() { return llvmType; }
+        public final String getPointerReg() { return pointerReg; }
+        public final boolean isConstant() { return isConstant; }
+        public final boolean isUsed() { return isUsed; }
         public void setUsed(boolean used) { this.isUsed = used; }
-        public int getCallCount() { return callCount; }
+        public final int getCallCount() { return callCount; }
         public void incrementCallCount() { this.callCount++; }
     }
 
@@ -61,7 +57,7 @@ public class SymbolTable {
      * defines a symbol in the current scope
      * returns false if the symbol is already present
      */
-    public boolean define(String name, SymbolInfo info) {
+    public final boolean define(final String name, final SymbolInfo info) {
         Map<String, SymbolInfo> current = scopes.peek();
         if (current == null || current.containsKey(name)) {
             return false;
@@ -73,9 +69,9 @@ public class SymbolTable {
     /**
      * searches a symbol starting from the current scope and going up
      */
-    public SymbolInfo lookup(String name) {
+    public final SymbolInfo lookup(final String name) {
         for (Map<String, SymbolInfo> scope : scopes) {
-            SymbolInfo info = scope.get(name);
+            final SymbolInfo info = scope.get(name);
             if (info != null) {
                 info.setUsed(true); // for optimization uses /warning
                 return info;
@@ -87,12 +83,12 @@ public class SymbolTable {
     /**
      * searches for a symbol only in the current scope
      */
-    public SymbolInfo lookupCurrentScope(String name) {
+    public final SymbolInfo lookupCurrentScope(String name) {
         Map<String, SymbolInfo> current = scopes.peek();
         return current != null ? current.get(name) : null;
     }
 
-    public int getDepth() {
+    public final int getDepth() {
         return scopes.size();
     }
 }

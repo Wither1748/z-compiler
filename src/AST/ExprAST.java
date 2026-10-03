@@ -12,7 +12,7 @@ public abstract class ExprAST {
 
     ExprAST() {}
 
-    public abstract String Codegen(IRBuilder builder);
+    public abstract String Codegen(final IRBuilder builder);
 
     public static ExprAST LogError(final String err) {
         System.err.printf("Error: %s%n", err);
@@ -45,7 +45,7 @@ public abstract class ExprAST {
         public int getIntVal() { return (int) val; }
 
         @Override
-        public String Codegen(IRBuilder builder) {
+        public String Codegen(final IRBuilder builder) {
             return String.valueOf(val);
         }
     }
@@ -86,18 +86,18 @@ public abstract class ExprAST {
         public final ExprAST getValue() { return value; }
 
         @Override
-        public String Codegen(IRBuilder builder) {
-            SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
+        public final String Codegen(final IRBuilder builder) {
+            final SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
             if (existing != null) {
                 // reference to an existing variable
                 return builder.emitLoad(existing.getLlvmType(), existing.getPointerReg());
             }
 
             // definining a new var
-            String llvmType = info != null ? info.getLlvmType() : "double";
-            String ptr = builder.emitAlloca(name, llvmType);
+            final String llvmType = info != null ? info.getLlvmType() : "double";
+            final String ptr = builder.emitAlloca(name, llvmType);
             if (value != null) {
-                String valReg = value.Codegen(builder);
+                final String valReg = value.Codegen(builder);
                 if (valReg != null) {
                     builder.emitStore(valReg, llvmType, ptr);
                 }
@@ -118,13 +118,13 @@ public abstract class ExprAST {
         }
 
         @Override
-        public String Codegen(IRBuilder builder) {
-            String leftVal = left.Codegen(builder);
-            String rightVal = right.Codegen(builder);
+        public final String Codegen(final IRBuilder builder) {
+            final String leftVal = left.Codegen(builder);
+            final String rightVal = right.Codegen(builder);
 
             if (leftVal == null || rightVal == null) return null;
 
-            String resultReg = builder.nextRegister();
+            final String resultReg = builder.nextRegister();
             switch (op) {
                 case '+':
                     builder.appendLine(resultReg + " = fadd double " + leftVal + ", " + rightVal);
@@ -139,7 +139,7 @@ public abstract class ExprAST {
                     builder.appendLine(resultReg + " = fdiv double " + leftVal + ", " + rightVal);
                     break;
                 case '<':
-                    String cmpReg = builder.nextRegister();
+                    final String cmpReg = builder.nextRegister();
                     builder.appendLine(cmpReg + " = fcmp olt double " + leftVal + ", " + rightVal);
                     builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to double");
                     break;
@@ -161,14 +161,14 @@ public abstract class ExprAST {
         }
 
         @Override
-        public String Codegen(IRBuilder builder) {
-            List<String> argRegs = new ArrayList<>();
+        public final String Codegen(final IRBuilder builder) {
+            final List<String> argRegs = new ArrayList<>();
             for (ExprAST arg : args) {
-                String argReg = arg.Codegen(builder);
+                final String argReg = arg.Codegen(builder);
                 if (argReg == null) return null;
                 argRegs.add("double " + argReg);
             }
-            String resultReg = builder.nextRegister();
+            final String resultReg = builder.nextRegister();
             builder.appendLine(resultReg + " = call double @" + callee + "(" + String.join(", ", argRegs) + ")");
             return resultReg;
         }
@@ -186,7 +186,7 @@ public abstract class ExprAST {
         public final String getName() { return name; }
 
         @Override
-        public String Codegen(IRBuilder builder) {
+        public final String Codegen(final IRBuilder builder) {
             return "";
         }
     }
@@ -198,10 +198,10 @@ public abstract class ExprAST {
             this.statement = statement;
         }
 
-        public ExprAST getStatement() { return statement; }
+        public final ExprAST getStatement() { return statement; }
 
         @Override
-        public String Codegen(IRBuilder builder) {
+        public final String Codegen(final IRBuilder builder) {
             if (statement != null) {
                 return statement.Codegen(builder);
             }
@@ -216,10 +216,10 @@ public abstract class ExprAST {
             this.statements = statements;
         }
 
-        public List<ExprAST> getStatements() { return statements; }
+        public final List<ExprAST> getStatements() { return statements; }
 
         @Override
-        public String Codegen(IRBuilder builder) {
+        public final String Codegen(final IRBuilder builder) {
             String lastVal = null;
             for (ExprAST stmt : statements) {
                 lastVal = stmt.Codegen(builder);
@@ -238,24 +238,24 @@ public abstract class ExprAST {
         }
 
         @Override
-        public String Codegen(IRBuilder builder) {
+        public final String Codegen(final IRBuilder builder) {
             builder.reset();
             symbolTable.enterScope();
 
-            StringBuilder functionIR = new StringBuilder();
+            final StringBuilder functionIR = new StringBuilder();
             boolean isMain = proto.getName().equals("main");
-            String retType = isMain ? "i32" : "double";
-            String linkage = isMain ? "dso_local" : "private dso_local";
+            final String retType = isMain ? "i32" : "double";
+            final String linkage = isMain ? "dso_local" : "private dso_local";
 
             functionIR.append("define ").append(linkage).append(" ").append(retType).append(" @").append(proto.getName()).append("() {\n");
             functionIR.append("entry:\n");
 
-            String retVal = body.Codegen(builder);
+            final String retVal = body.Codegen(builder);
 
             if (retVal != null) {
                 functionIR.append(builder.getIR());
                 if (isMain) {
-                    String intReg = builder.nextRegister();
+                    final String intReg = builder.nextRegister();
                     functionIR.append("  ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
                     functionIR.append("  ret i32 ").append(intReg).append("\n");
                 } else {
@@ -283,12 +283,12 @@ public abstract class ExprAST {
             this.value = value;
         }
 
-        public String getType() { return type; }
-        public String getName() { return name; }
-        public ExprAST getValue() { return value; }
+        public final String getType() { return type; }
+        public final String getName() { return name; }
+        public final ExprAST getValue() { return value; }
 
         @Override
-        public String Codegen(IRBuilder builder) {
+        public final String Codegen(final IRBuilder builder) {
             if (value != null) {
                 return value.Codegen(builder);
             }

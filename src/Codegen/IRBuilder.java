@@ -4,7 +4,7 @@ public class IRBuilder {
     private int registerCount = 1;
     private final StringBuilder irCode = new StringBuilder();
 
-    public String nextRegister() {
+    public final String nextRegister() {
         return "%" + (registerCount++);
     }
 
@@ -12,12 +12,12 @@ public class IRBuilder {
         irCode.append(" ").append(line).append("\n");
     }
 
-    public String getIR() {
+    public final String getIR() {
         return irCode.toString();
     }
 
     @Override
-    public String toString() {
+    public final String toString() {
         return getIR();
     }
 
@@ -26,24 +26,24 @@ public class IRBuilder {
         irCode.setLength(0);
     }
 
-    public String emitAlloca(String varName, String llvmType) {
-        String ptr = "%" + varName;
+    public final String emitAlloca(final String varName, final String llvmType) {
+        final String ptr = "%" + varName;
         appendLine(ptr + " = alloca " + llvmType);
         return ptr;
     }
 
-    public void emitStore(String val, String llvmType, String ptr) {
+    public void emitStore(final String val, final String llvmType, final String ptr) {
         appendLine("store " + llvmType + " " + val + ", ptr " + ptr);
     }
 
-    public String emitLoad(String llvmType, String ptr) {
-        String reg = nextRegister();
+    public final String emitLoad(final String llvmType, final String ptr) {
+        final String reg = nextRegister();
         appendLine(reg + " = load " + llvmType + ", ptr " + ptr);
         return reg;
     }
 
     private int labelCount = 0;
-    public String nextLabel(String prefix) {
+    public final String nextLabel(final String prefix) {
         return prefix + "." + (labelCount++);
     }
 }

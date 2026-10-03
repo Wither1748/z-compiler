@@ -46,12 +46,12 @@ public class Lexer {
         public final String description;
         public final int value;
 
-        Tokens(String description, int value) {
+        Tokens(final String description, final int value) {
             this.description = description;
             this.value = value;
         }
 
-        public static Tokens fromValues(int value) {
+        public static Tokens fromValues(final int value) {
             return java.util.Arrays.stream(values()).filter(token -> token.value == value).findFirst().orElse(null);
         }
     }
@@ -72,7 +72,7 @@ public class Lexer {
     }
 
 
-    public Lexer(InputStream input) {
+    public Lexer(final InputStream input) {
         this.input = input;
     }
 
@@ -103,7 +103,7 @@ public class Lexer {
         // chars
 
         if (Character.isAlphabetic(LastChar)) {
-                StringBuilder sb = new StringBuilder();
+                final StringBuilder sb = new StringBuilder();
 
                 do {
                     sb.append((char) LastChar);
@@ -113,7 +113,7 @@ public class Lexer {
                 IdentifierStr = sb.toString();
 
                 // hashmap should be faster
-                Tokens token = keywordMap.get(IdentifierStr);
+                final Tokens token = keywordMap.get(IdentifierStr);
                 if (token != null && token != Tokens.IDENTIFIER && token != Tokens.NUMBER && token != Tokens.EOF) {
                     return token.value;
                 }
@@ -124,7 +124,7 @@ public class Lexer {
 
             // numbers
             if (Character.isDigit(LastChar) || LastChar == '.') {
-                StringBuilder NumStr = new StringBuilder();
+                final StringBuilder NumStr = new StringBuilder();
 
                 do {
                     NumStr.append((char) LastChar);
@@ -151,7 +151,7 @@ public class Lexer {
             return Tokens.DIV.value;
         }
 
-        Tokens symbol = keywordMap.get(Character.toString((char) LastChar));
+        final Tokens symbol = keywordMap.get(Character.toString((char) LastChar));
 
         if (symbol != null) {
             LastChar = input.read();
@@ -159,7 +159,7 @@ public class Lexer {
         }
 
             // returns the ASCII if unrecognized
-            int ThisChar = LastChar;
+            final int ThisChar = LastChar;
 
             // next one
             LastChar = input.read();

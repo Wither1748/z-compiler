@@ -25,15 +25,15 @@ class CompilerCmd implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        String zCode = Files.readString(sourceFile.toPath());
+        final String zCode = Files.readString(sourceFile.toPath());
 
         System.out.println("Starting compilation...");
 
         try {
             InputStream input = new ByteArrayInputStream(zCode.getBytes(StandardCharsets.UTF_8));
 
-            String llFilePath;
-            String binaryName;
+            final String llFilePath;
+            final String binaryName;
             if (outPath == null) {
                 llFilePath = "output.ll";
                 binaryName = "output";
@@ -45,18 +45,18 @@ class CompilerCmd implements Callable<Integer> {
                 binaryName = outPath;
             }
 
-            Lexer lexer = new Lexer(input);
-            Parser parser = new Parser(lexer);
+            final Lexer lexer = new Lexer(input);
+            final Parser parser = new Parser(lexer);
 
-            ExprAST.FunctionAST mainFunction = parser.ParseDefinition();
+            final ExprAST.FunctionAST mainFunction = parser.ParseDefinition();
 
             if (mainFunction == null) {
                 System.err.println("Syntax error");
                 return 1;
             }
 
-            IRBuilder builder = new IRBuilder();
-            String llvmIR = mainFunction.Codegen(builder);
+            final IRBuilder builder = new IRBuilder();
+            final String llvmIR = mainFunction.Codegen(builder);
 
             if (llvmIR == null) {
                 System.err.println("Error building the IR");
@@ -64,7 +64,7 @@ class CompilerCmd implements Callable<Integer> {
             }
 
             System.out.println(llvmIR);
-            File irFile = new File(llFilePath);
+            final File irFile = new File(llFilePath);
             Files.writeString(irFile.toPath(), llvmIR);
             System.out.println("File IR built successfully: " + llFilePath);
 
@@ -81,11 +81,11 @@ class CompilerCmd implements Callable<Integer> {
     private static void compileToBinary(String llFilePath, String outputBinaryName) {
         System.out.println("Launching Clang...");
 
-        ProcessBuilder processBuilder = createProcessBuilder(llFilePath, outputBinaryName);
+        final ProcessBuilder processBuilder = createProcessBuilder(llFilePath, outputBinaryName);
 
         try {
-            Process process = processBuilder.start();
-            int exitCode = process.waitFor();
+            final Process process = processBuilder.start();
+            final int exitCode = process.waitFor();
 
             if (exitCode == 0) {
                 System.out.println("Executable created: ./" + outputBinaryName);
@@ -99,7 +99,7 @@ class CompilerCmd implements Callable<Integer> {
     }
 
     private static ProcessBuilder createProcessBuilder(String llFilePath, String outputBinaryName) {
-        ProcessBuilder processBuilder = new ProcessBuilder(
+        final ProcessBuilder processBuilder = new ProcessBuilder(
                 "clang",
                 "-O3",
                 "-flto",
