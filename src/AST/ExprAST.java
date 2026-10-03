@@ -96,6 +96,9 @@ public abstract class ExprAST {
          * @return value of the number
          */
         public String Codegen(final IRBuilder builder) {
+            if (val == (long) val) {
+                return String.valueOf((long) val);
+            }
             return String.valueOf(val);
         }
     }
@@ -149,6 +152,7 @@ public abstract class ExprAST {
             this.name = idName;
             this.type = "flt64";
             this.value = null;
+            this.info = null;
         }
 
         /**
@@ -166,32 +170,33 @@ public abstract class ExprAST {
          * @return value of the variable
          */
         public final String Codegen(final IRBuilder builder) {
-            final SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
-            if (existing != null) {
-                // reference to an existing variable
+            if (this.info == null) {
+                // use of a variable
+                final SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
+                if (existing == null) {
+                    ExprAST.LogErrorV("Variabile non dichiarata: " + name);
+                    return null;
+                }
                 return builder.emitLoad(existing.getLlvmType(), existing.getPointerReg());
-            }
+            } else {
+                // new variable
+                final boolean result = symbolTable.define(name, this.info);
+                if (!result) {
+                    ExprAST.LogErrorV("Shadowing o ridichiarazione della variabile nello scope: " + name);
+                    return null;
+                }
 
-            // definining a new var
-            final boolean result = symbolTable.define(name, this.info);
-            if (!result) {
-                ExprAST.LogErrorV("Shadowing or redeclaration of variable in current scope: " + name);
-            }
-            final String llvmType = info != null ? info.getLlvmType() : "double";
-            final String ptr = builder.emitAlloca(name, llvmType);
-            if (value != null) {
-                String valReg;
-                if (value instanceof NumberExprAST && !llvmType.equals("double") && !llvmType.equals("float")) {
-                    // Convert default value to integer literal for integer types
-                    valReg = String.valueOf(((NumberExprAST) value).getIntVal());
-                } else {
-                    valReg = value.Codegen(builder);
+                final String llvmType = info.getLlvmType();
+                final String ptr = builder.emitAlloca(name, llvmType);
+
+                if (value != null) {
+                    String valReg = value.Codegen(builder);
+                    if (valReg != null) {
+                        builder.emitStore(valReg, llvmType, ptr);
+                    }
                 }
-                if (valReg != null) {
-                    builder.emitStore(valReg, llvmType, ptr);
-                }
+                return ptr;
             }
-            return ptr;
         }
     }
 
@@ -232,29 +237,53 @@ public abstract class ExprAST {
 
             if (leftVal == null || rightVal == null) return null;
 
+            String leftType = builder.getRegisterType(leftVal);
+            if (leftType == null) {
+                leftType = leftVal.contains(".") ? "double" : "i32";
+            }
+
+            boolean isFloat = leftType.equals("double") || leftType.equals("float");
             final String resultReg = builder.nextRegister();
+
             switch (op) {
                 case '+':
-                    builder.appendLine(resultReg + " = fadd double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fadd " : "add ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '-':
-                    builder.appendLine(resultReg + " = fsub double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fsub " : "sub ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '*':
-                    builder.appendLine(resultReg + " = fmul double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fmul " : "mul ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '/':
-                    builder.appendLine(resultReg + " = fdiv double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fdiv " : "sdiv ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '<':
-                    final String cmpReg = builder.nextRegister();
-                    builder.appendLine(cmpReg + " = fcmp olt double " + leftVal + ", " + rightVal);
-                    builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to double");
+                    String cmpReg = builder.nextRegister();
+                    if (isFloat) {
+                        builder.appendLine(cmpReg + " = fcmp olt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to " + leftType);
+                    } else {
+                        builder.appendLine(cmpReg + " = icmp slt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = zext i1 " + cmpReg + " to " + leftType);
+                    }
+                    break;
+                case '>':
+                    cmpReg = builder.nextRegister();
+                    if (isFloat) {
+                        builder.appendLine(cmpReg + " = fcmp ogt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to " + leftType);
+                    } else {
+                        builder.appendLine(cmpReg + " = icmp sgt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = zext i1 " + cmpReg + " to " + leftType);
+                    }
                     break;
                 default:
-                    System.err.println("Unsupported operation: " + op);
+                    System.err.println("Operazione non supportata: " + op);
                     return null;
             }
+
+            builder.setRegisterType(resultReg, leftType);
             return resultReg;
         }
     }
@@ -460,7 +489,7 @@ public abstract class ExprAST {
                     if (retVal.matches("-?\\d+\\.0+")) {
                         functionIR.append(" ret i32 ").append(retVal.substring(0, retVal.indexOf('.'))).append("\n");
                     } else if (retVal.matches("-?\\d+")) {
-                        functionIR.append("  ret i32 ").append(retVal).append("\n");
+                        functionIR.append(" ret i32 ").append(retVal).append("\n");
                     } else {
                         // Check if the register is already i32 type
                         final String regType = builder.getRegisterType(retVal);
@@ -526,10 +555,22 @@ public abstract class ExprAST {
          * @return the code for a constant
          */
         public final String Codegen(final IRBuilder builder) {
-            if (value != null) {
-                return value.Codegen(builder);
+            String llvmType = Types.getLlvmType(type);
+            SymbolTable.SymbolInfo info = new SymbolTable.SymbolInfo(name, llvmType, "%" + name, true);
+
+            if (!symbolTable.define(name, info)) {
+                ExprAST.LogErrorC("Constant redefinition: " + name);
+                return null;
             }
-            return "";
+
+            String ptr = builder.emitAlloca(name, llvmType);
+            if (value != null) {
+                String valReg = value.Codegen(builder);
+                if (valReg != null) {
+                    builder.emitStore(valReg, llvmType, ptr);
+                }
+            }
+            return ptr;
         }
     }
 }
