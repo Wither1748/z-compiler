@@ -5,8 +5,15 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+
+/**
+ * Parses the source code and returns various Tokens, if it's unknown returns the ASCII value
+ */
 public class Lexer {
 
+    /**
+     * Enum of Tokens
+     */
     public enum Tokens {
         FUNC("proc", -1),
         INT64("int64", -2),
@@ -43,28 +50,41 @@ public class Lexer {
         SAME("=", -32),
         CN("cn", -35);
 
+        /**
+         * Attributes: description is to identify the token; the value is the return value
+         */
         public final String description;
         public final int value;
 
+        // constructor for the Tokens
         Tokens(final String description, final int value) {
             this.description = description;
             this.value = value;
         }
 
+        // helper method to get the token from the value
         public static Tokens fromValues(final int value) {
             return java.util.Arrays.stream(values()).filter(token -> token.value == value).findFirst().orElse(null);
         }
     }
 
-    // status vars
+    /**
+     * Lastchar is used to store the last char lol, IdentifierStr is used to store the String value of the identifier token (es. variable)
+     * NumVal is used to store the value of the number token (es. 10)
+     */
     private int LastChar = ' ';
     public String IdentifierStr;
     public double NumVal;
 
+    // stream for the input
     private final InputStream input;
 
+    /**
+     * HashMap to store the keywords and their corresponding Tokens
+     */
     private static final Map<String, Tokens> keywordMap = new HashMap<>();
 
+    // using static like this is like a constructor that executes itself on the declaration
     static {
         for (Tokens t : Tokens.values()) {
             keywordMap.put(t.description, t);
@@ -72,10 +92,19 @@ public class Lexer {
     }
 
 
+    /**
+     * Constructor for the Lexer
+     * @param input stream for the input
+     */
     public Lexer(final InputStream input) {
         this.input = input;
     }
 
+    /**
+     * Returns the next token
+     * @return the next token
+     * @throws IOException if an I/O error occurs
+     */
     public int GetTok() throws IOException {
 
         // skips whitespaces
@@ -151,6 +180,7 @@ public class Lexer {
             return Tokens.DIV.value;
         }
 
+        // symbols
         final Tokens symbol = keywordMap.get(Character.toString((char) LastChar));
 
         if (symbol != null) {

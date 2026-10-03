@@ -8,10 +8,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Parser class to parse Z code using an AST
+ */
 public class Parser {
+    /**
+     * curTok stores the current Token from the Lexer
+     * lex stores the Lexer
+     */
     private int curTok;
     private Lexer lex = null;
 
+    /**
+     * BinOpPrecedence stores the precedence of binary operators
+     */
     public static final HashMap<Integer, Integer> BinOpPrecedence = new HashMap<>();
     static {
         BinOpPrecedence.put(Lexer.Tokens.LESS.value, 10);
@@ -23,13 +33,25 @@ public class Parser {
         BinOpPrecedence.put(Lexer.Tokens.DIV.value, 40);
     }
 
+    /**
+     * functionCount stores the count of functions for future optimizations
+     */
     public static HashMap<String, Integer> functionCount = new HashMap<>();
 
+    /**
+     * Constructor for Parser
+     * @param lex the lexer object
+     * @throws IOException
+     */
     public Parser(final Lexer lex) throws IOException {
         this.lex = lex;
         this.curTok = lex.GetTok();
     }
 
+    /**
+     * MainLoop method to parse the input
+     * @throws IOException
+     */
     public void MainLoop() throws IOException {
         while (true) {
             final Lexer.Tokens token = Lexer.Tokens.fromValues(curTok);
@@ -51,6 +73,10 @@ public class Parser {
         }
     }
 
+    /**
+     * Handle the definition of a function
+     * @throws IOException
+     */
     public void HandleDefinition() throws IOException {
         final ExprAST.FunctionAST e = ParseDefinition();
         if (e != null) {
@@ -60,6 +86,10 @@ public class Parser {
         }
     }
 
+    /**
+     * handles the definition and assignment of a constant
+     * @throws IOException
+     */
     public void HandleConstant() throws IOException {
         final ExprAST.ConstantAST c = ParseConstant();
         if (c != null) {
@@ -69,6 +99,10 @@ public class Parser {
         }
     }
 
+    /**
+     * Handles the definition e/o assignment of a variable
+     * @throws IOException
+     */
     public void HandleVariable() throws IOException {
         final ExprAST.VariableExprAST v = ParseVariable();
         if (v != null) {
@@ -78,6 +112,11 @@ public class Parser {
         }
     }
 
+    /**
+     * Parses a variable
+     * @return an AST node or an error
+     * @throws IOException
+     */
     public final ExprAST.VariableExprAST ParseVariable() throws IOException {
         final Lexer.Tokens type = Lexer.Tokens.fromValues(curTok);
         Next();
@@ -98,6 +137,11 @@ public class Parser {
         return new ExprAST.VariableExprAST(name, type.description, val);
     }
 
+    /**
+     * Parses a definition and assignement of a constant
+     * @return an AST node or an expression
+     * @throws IOException
+     */
     public final ExprAST.ConstantAST ParseConstant() throws IOException {
         Next();
 
@@ -125,6 +169,11 @@ public class Parser {
         return new ExprAST.ConstantAST(type, name, value);
     }
 
+    /**
+     * Checks if a token is a type token
+     * @param t the token to check
+     * @return true if the token is a type token, false otherwise
+     */
     private final boolean isTypeToken(final Lexer.Tokens t) {
         return t == Lexer.Tokens.INT64
                 || t == Lexer.Tokens.INT32
@@ -136,17 +185,33 @@ public class Parser {
                 || t == Lexer.Tokens.UINT64;
     }
 
+    /**
+     * Helper method to get the next token from the lexer
+     * @return the next token
+     * @throws IOException
+     */
     private final int Next() throws IOException {
         curTok = lex.GetTok();
         return curTok;
     }
 
+    /**
+     * Parses a number expression
+     * @param numVal double value
+     * @return a number Expression
+     * @throws IOException
+     */
     public final ExprAST ParseNumberExpr(final double numVal) throws IOException {
         final ExprAST result = new ExprAST.NumberExprAST(numVal);
         Next();
         return result;
     }
 
+    /**
+     * Parses a parenthesis expression
+     * @return an Expression node or an error
+     * @throws IOException
+     */
     public final ExprAST ParseParenExpr() throws IOException {
         Next();
         final ExprAST V = ParseExpression();
@@ -159,6 +224,11 @@ public class Parser {
         return V;
     }
 
+    /**
+     * Parses an identifier expression
+     * @return an Expression node or an error
+     * @throws IOException
+     */
     public final ExprAST ParseIdentifierExpr() throws IOException {
         final String idName = lex.IdentifierStr;
         Next();
@@ -190,6 +260,11 @@ public class Parser {
         return new ExprAST.CallExprAST(idName, args);
     }
 
+    /**
+     * Parses a primary expression (general one)
+     * @return an Expression node or an error
+     * @throws IOException
+     */
     public final ExprAST ParsePrimary() throws IOException {
         if (curTok == Lexer.Tokens.OPEN_FUNC.value) {
             Next();
@@ -206,18 +281,32 @@ public class Parser {
         }
     }
 
+    /**
+     * Returns the precedence of the current token
+     * @return the precedence of the current token or -1 if it's not a binary operator
+     */
     public final int GetTokPrecedence() {
         final Integer TokPrec = BinOpPrecedence.get(curTok);
         if (TokPrec == null || TokPrec <= 0) return -1;
         return TokPrec;
     }
 
+    /**
+     * Parses a Ret instruction
+     * @return an RetAST node
+     * @throws IOException
+     */
     public final ExprAST ParseRet() throws IOException {
         Next();
         final ExprAST rightSide = ParseExpression();
         return new ExprAST.RetAST(Objects.requireNonNullElseGet(rightSide, () -> new ExprAST.NumberExprAST(0.0)));
     }
 
+    /**
+     * Parses a statement
+     * @return , in reality it just calls other functions
+     * @throws IOException
+     */
     public final ExprAST ParseStatement() throws IOException {
         final Lexer.Tokens token = Lexer.Tokens.fromValues(curTok);
         if (token == Lexer.Tokens.RET) {
@@ -231,6 +320,11 @@ public class Parser {
         }
     }
 
+    /**
+     * Parses an expression (general use)
+     * @return null or calls other functions
+     * @throws IOException
+     */
     public final ExprAST ParseExpression() throws IOException {
         final ExprAST LHS = ParsePrimary();
         if (LHS == null) return null;
@@ -238,6 +332,13 @@ public class Parser {
         return ParseBinOpRHS(0, LHS);
     }
 
+    /**
+     * Parses a binary operation
+     * @param ExprPrec precedence of the operator
+     * @param LHS left side
+     * @return null or a BinaryExprAST node
+     * @throws IOException
+     */
     public final ExprAST ParseBinOpRHS(final int ExprPrec, ExprAST LHS) throws IOException {
         while (true) {
             final int TokPrec = GetTokPrecedence();
@@ -262,6 +363,11 @@ public class Parser {
         }
     }
 
+    /**
+     * Parses a function prototype
+     * @return an error or a PrototypeAST node
+     * @throws IOException
+     */
     public final  ExprAST.PrototypeAST ParsePrototype() throws IOException {
         if (curTok != Lexer.Tokens.IDENTIFIER.value) {
             return ExprAST.LogErrorP("Expected function name in prototype");
@@ -288,6 +394,11 @@ public class Parser {
         return new ExprAST.PrototypeAST(fnName, argNames);
     }
 
+    /**
+     * Parses a function definition
+     * @return null or a FunctionAST node
+     * @throws IOException
+     */
     public final ExprAST.FunctionAST ParseDefinition() throws IOException {
         Next();
         final ExprAST.PrototypeAST proto = ParsePrototype();
