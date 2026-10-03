@@ -101,49 +101,49 @@ public abstract class ExprAST {
     }
 
     /**
-     * Variable expression class, gets called in case of an ID token (es. x)
+     * Variable expression class, handles both variable declaration and reference.
+     * Declaration:  int32 var        or   int32 var -> expr
+     * Reference:    var
      */
     public static class VariableExprAST extends ExprAST {
-        // !!!! This is kind of messed up
-        /**
-         * name is the name of the variable
-         * type is the Ztype of the variable (es. int32)
-         * value is the value of the variable using ExprAST
-         * info is the symbol table entry of the variable
-         */
         private final String name;
         private final String type;
         private ExprAST value;
         private SymbolTable.SymbolInfo info;
 
         /**
-         * gets name, type and value (es. int32 var -> Expr) to define a new symbol table entry and initialize the variable
-         * @param name name of the var
-         * @param type Ztype of the var
-         * @param value ExprAST value of the var
+         * Declaration with assignment: int32 var -> expr
+         * @param name  variable name
+         * @param type  Z type (e.g. "int32")
+         * @param value initial value expression
          */
         public VariableExprAST(final String name, final String type, final ExprAST value) {
             this.name = name;
             this.type = type;
             this.value = value;
-            this.info = new SymbolTable.SymbolInfo(name, Types.getLlvmType(type), "%" + name, false);
+            this.info = new SymbolTable.SymbolInfo(
+                    name, Types.getLlvmType(type), "%" + name, false);
         }
 
         /**
-         * Gets name and type of a var without declaration (es. int32 var), also checks if the var is already defined
-         * @param name name of the var
-         * @param type Ztype of the var
+         * Declaration without assignment: int32 var
+         * Note: does NOT define the symbol here, and does NOT set a default value.
+         * The symbol is registered lazily inside Codegen, so that alloca is emitted
+         * exactly once on first use.
+         * @param name variable name
+         * @param type Z type (e.g. "int32")
          */
         public VariableExprAST(final String name, final String type) {
             this.name = name;
             this.type = type;
-            this.value = new NumberExprAST(Double.parseDouble(Types.getDefaultValue(type)));
+            this.value = null;
             this.info = new SymbolTable.SymbolInfo(name, Types.getLlvmType(type), "%" + name, false);
         }
 
         /**
-         * used only for compatibility issues, don't use it
-         * @param idName name of the var
+         * Compatibility constructor, used for plain references (e.g. "ret var").
+         * info stays null; Codegen falls back to symbolTable.lookup.
+         * @param idName variable name
          */
         public VariableExprAST(final String idName) {
             this.name = idName;
@@ -151,34 +151,26 @@ public abstract class ExprAST {
             this.value = null;
         }
 
-        /**
-         * Getters methods for a var: name, type and value
-         * @return name, value and type
-         */
         public final String getName() { return name; }
         public final String getType() { return type; }
         public final ExprAST getValue() { return value; }
 
         @Override
-        /**
-         * Returns the value of the variable as a string
-         * @param builder IRBuilder to generate code
-         * @return value of the variable
-         */
         public final String Codegen(final IRBuilder builder) {
+            // 1. Symbol already in the table -> this is a reference, just load it.
             final SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
             if (existing != null) {
-                // reference to an existing variable
                 return builder.emitLoad(existing.getLlvmType(), existing.getPointerReg());
             }
 
-            // definining a new var
-            final boolean result = symbolTable.define(name, this.info);
-            if (!result) {
-                ExprAST.LogErrorV("Shadowing or redeclaration of variable in current scope: " + name);
-            }
+            // 2. Not in the table -> first declaration.
             final String llvmType = info != null ? info.getLlvmType() : "double";
-            final String ptr = builder.emitAlloca(name, llvmType);
+            final String ptr = builder.emitAlloca(name, llvmType);   // %var = alloca i32
+            if (info != null) {
+                symbolTable.define(name, info);                      // register now
+            }
+
+            // 3. Only emit a store if there is an explicit initial value.
             if (value != null) {
                 String valReg;
                 if (value instanceof NumberExprAST && !llvmType.equals("double") && !llvmType.equals("float")) {
@@ -191,7 +183,9 @@ public abstract class ExprAST {
                     builder.emitStore(valReg, llvmType, ptr);
                 }
             }
-            return ptr;
+
+            // 4. The value of a declaration statement is the loaded value.
+            return builder.emitLoad(llvmType, ptr);                  // %1 = load i32, ptr %var
         }
     }
 
@@ -444,7 +438,7 @@ public abstract class ExprAST {
             symbolTable.enterScope();
 
             final StringBuilder functionIR = new StringBuilder();
-            boolean isMain = proto.getName().equals("main");
+            final boolean isMain = proto.getName().equals("main");
             final String retType = isMain ? "i32" : "double";
             final String linkage = isMain ? "dso_local" : "private dso_local";
 
@@ -456,21 +450,15 @@ public abstract class ExprAST {
             if (retVal != null) {
                 functionIR.append(builder.getIR());
                 if (isMain) {
-                    // Check if retVal is an integer literal (including decimal representations like 0.0)
-                    if (retVal.matches("-?\\d+\\.0+")) {
-                        functionIR.append(" ret i32 ").append(retVal.substring(0, retVal.indexOf('.'))).append("\n");
-                    } else if (retVal.matches("-?\\d+")) {
-                        functionIR.append("  ret i32 ").append(retVal).append("\n");
+                    if (retVal.endsWith(".0")) {
+                        // Integer literal (e.g. "0.0" -> "0"): emit ret i32 directly.
+                        final String intLit = retVal.substring(0, retVal.length() - 2);
+                        functionIR.append(" ret i32 ").append(intLit).append("\n");
                     } else {
-                        // Check if the register is already i32 type
-                        final String regType = builder.getRegisterType(retVal);
-                        if (regType != null && regType.equals("i32")) {
-                            functionIR.append(" ret i32 ").append(retVal).append("\n");
-                        } else {
-                            final String intReg = builder.nextRegister();
-                            functionIR.append(" ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
-                            functionIR.append(" ret i32 ").append(intReg).append("\n");
-                        }
+                        // Expression result: convert double to i32 first.
+                        final String intReg = builder.nextRegister();
+                        functionIR.append("  ").append(intReg).append(" = fptosi double ").append(retVal).append(" to i32\n");
+                        functionIR.append("  ret i32 ").append(intReg).append("\n");
                     }
                 } else {
                     functionIR.append(" ret double ").append(retVal).append("\n");
