@@ -2,7 +2,14 @@ package src.Parser;
 
 import java.util.HashMap;
 
+/**
+ * Types helper class to map Z types to LLVM types and get default values
+ */
 public class Types {
+    /**
+     * types is an hashmap to store the correlation between Ztypes and LLVM types
+     * defaultValues stores the correlation between Ztypes and their default values
+     */
     protected static final HashMap<String, String> types = new HashMap<>();
     protected static final HashMap<String, String> defaultValues = new HashMap<>();
 
@@ -22,10 +29,20 @@ public class Types {
         defaultValues.put("01", "0");
     }
 
+    /**
+     * Getter method for the Ztype
+     * @param zType the Ztype
+     * @return the corresponding LLVM type
+     */
     public static String getLlvmType(final String zType) {
         return types.getOrDefault(zType, "double");
     }
 
+    /**
+     * getter method for a default value
+     * @param zType with the ztype
+     * @return the default value for that type
+     */
     public static String getDefaultValue(final String zType) {
         return defaultValues.getOrDefault(zType, "0.0");
     }

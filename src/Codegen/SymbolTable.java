@@ -2,9 +2,23 @@ package src.Codegen;
 
 import java.util.*;
 
+/**
+ * SymbolTable is a class that represents the symbol table of the program
+ */
 public class SymbolTable {
 
+    /**
+     * SymbolInfo is a class that represents the information of a symbol
+     */
     public static class SymbolInfo {
+        /**
+         * name is the name of the var
+         * llvmType is the LLVM type of the var
+         * pointerReg is the register of the var
+         * isConstant is true if the var is a constant
+         * isUsed is true if the var is used
+         * callCount is the number of times the var is called
+         */
         private final String name;
         private final String llvmType;
         private final String pointerReg;
@@ -12,6 +26,13 @@ public class SymbolTable {
         private boolean isUsed;
         private int callCount;
 
+        /**
+         * constructor for the SymbolInfo for a variable
+         * @param name name of the var
+         * @param llvmType llvmtype of the var
+         * @param pointerReg the register in which the pointer is stored
+         * @param isConstant is it a constant?
+         */
         public SymbolInfo(String name, String llvmType, String pointerReg, boolean isConstant) {
             this.name = name;
             this.llvmType = llvmType;
@@ -21,6 +42,10 @@ public class SymbolTable {
             this.callCount = 0;
         }
 
+        /**
+         * getter methods for a symbol info
+         * @return name, type, ptrReg, isConstant, isUsed, callCount
+         */
         public final String getName() { return name; }
         public final String getLlvmType() { return llvmType; }
         public final String getPointerReg() { return pointerReg; }
@@ -31,8 +56,15 @@ public class SymbolTable {
         public void incrementCallCount() { this.callCount++; }
     }
 
+    /**
+     * Deque of maps of symbol info
+     */
     private final Deque<Map<String, SymbolInfo>> scopes = new ArrayDeque<>();
 
+    /**
+     * constructor for the symbol table
+     * creates the initial global scope
+     */
     public SymbolTable() {
         enterScope(); // initial global scope
     }
@@ -88,6 +120,10 @@ public class SymbolTable {
         return current != null ? current.get(name) : null;
     }
 
+    /**
+     * getter method for a SymbolTable
+     * @return the size (number of stacks, functions)
+     */
     public final int getDepth() {
         return scopes.size();
     }

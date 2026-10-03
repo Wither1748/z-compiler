@@ -16,6 +16,9 @@ import java.nio.file.Files;
 import java.util.concurrent.Callable;
 
 @Command(name = "compiler", mixinStandardHelpOptions = true, version = "1", description = "Compiler z-code")
+/**
+ * Command line interface for the compiler
+ */
 class CompilerCmd implements Callable<Integer> {
     @CommandLine.Parameters(index = "0", description = "Source file to be compiled")
     private File sourceFile;
@@ -24,6 +27,11 @@ class CompilerCmd implements Callable<Integer> {
     private String outPath;
 
     @Override
+    /**
+     * Main method for the compiler
+     * @return 0 if the compilation is successful, 1 otherwise
+     * @throws Exception if an I/O error occurs
+     */
     public Integer call() throws Exception {
         final String zCode = Files.readString(sourceFile.toPath());
 
@@ -78,6 +86,11 @@ class CompilerCmd implements Callable<Integer> {
         }
     }
 
+    /**
+     * Wrapper for calling cLang with a try/catch block
+     * @param llFilePath file path for the LLVM file
+     * @param outputBinaryName name for the final binary file
+     */
     private static void compileToBinary(String llFilePath, String outputBinaryName) {
         System.out.println("Launching Clang...");
 
@@ -98,6 +111,12 @@ class CompilerCmd implements Callable<Integer> {
         }
     }
 
+    /**
+     * invokes Clang to create the final binary
+     * @param llFilePath path for the LLVM file
+     * @param outputBinaryName name for the final binary file
+     * @return a ProcesssBuilder object
+     */
     private static ProcessBuilder createProcessBuilder(String llFilePath, String outputBinaryName) {
         final ProcessBuilder processBuilder = new ProcessBuilder(
                 "clang",
@@ -118,6 +137,9 @@ class CompilerCmd implements Callable<Integer> {
     }
 }
 
+/**
+ * Main class, nothing to say
+ */
 public class Main {
     public static void main(String[] args) {
         new CommandLine(new CompilerCmd()).execute(args);
