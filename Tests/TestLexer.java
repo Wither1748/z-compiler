@@ -15,7 +15,7 @@ public class TestLexer {
         // for now (int64 fails because it gets treated as one string
         String code = "proc name ( int64 name | int64 name) { \n ret 281 \n }";
 
-        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
+        final Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
 
         assertEquals(Lexer.Tokens.FUNC.value, lex.GetTok());
         assertEquals(Lexer.Tokens.IDENTIFIER.value, lex.GetTok());
@@ -35,9 +35,9 @@ public class TestLexer {
     @Test
     void testConditionalTokens() throws IOException {
         // for now (int64 fails because it gets treated as one string
-        String code = "if name > 64 { \n\n } eif name < 32 { \n \n } else { \n \n }";
+        final String code = "if name > 64 { \n\n } eif name < 32 { \n \n } else { \n \n }";
 
-        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
+        final Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
 
         assertEquals(Lexer.Tokens.IF.value, lex.GetTok());
         assertEquals(Lexer.Tokens.IDENTIFIER.value, lex.GetTok());
@@ -58,26 +58,26 @@ public class TestLexer {
 
     @Test
     void testAssignmentOperator() throws IOException {
-        String code = "->";
+        final String code = "->";
 
-        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
+        final Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
 
         assertEquals(Lexer.Tokens.ASSIGN.value, lex.GetTok());
     }
 
     @Test
     void testSlashComments() throws IOException {
-        String code = "// this is a comment\nret";
+        final String code = "// this is a comment\nret";
 
-        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
+        final Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
 
         assertEquals(Lexer.Tokens.RET.value, lex.GetTok());
     }
 
     @Test
     void testConstantToken() throws IOException {
-        String code = "cn int64 PI -> 314";
-        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
+        final String code = "cn int64 PI -> 314";
+        final Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes()));
 
         assertEquals(Lexer.Tokens.CN.value, lex.GetTok());
         assertEquals(Lexer.Tokens.INT64.value, lex.GetTok());
@@ -91,7 +91,7 @@ public class TestLexer {
     @Test
     void testVariableAssignment() throws IOException {
         final String code = "int32 var -> 30";
-        Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes(StandardCharsets.UTF_8)));
+        final Lexer lex = new Lexer(new ByteArrayInputStream(code.getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(Lexer.Tokens.INT32.value, lex.GetTok());
         assertEquals(Lexer.Tokens.IDENTIFIER.value, lex.GetTok());

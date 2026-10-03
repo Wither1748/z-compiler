@@ -17,23 +17,23 @@ import java.util.concurrent.Callable;
 
 @Command(name = "compiler", mixinStandardHelpOptions = true, version = "1", description = "Compiler z-code")
 class CompilerCmd implements Callable<Integer> {
-    @CommandLine.Parameters(index = "0", description = "Source to file to be compiled")
+    @CommandLine.Parameters(index = "0", description = "Source file to be compiled")
     private File sourceFile;
 
-    @CommandLine.Option(names = {"-o", "--out"}, description = "out directory")
+    @CommandLine.Option(names = {"-o", "--out"}, description = "Output path")
     private String outPath;
 
     @Override
     public Integer call() throws Exception {
-        String zCode = Files.readString(sourceFile.toPath());
+        final String zCode = Files.readString(sourceFile.toPath());
 
-        System.out.println("Compilation");
+        System.out.println("Starting compilation...");
 
         try {
             InputStream input = new ByteArrayInputStream(zCode.getBytes(StandardCharsets.UTF_8));
 
-            String llFilePath;
-            String binaryName;
+            final String llFilePath;
+            final String binaryName;
             if (outPath == null) {
                 llFilePath = "output.ll";
                 binaryName = "output";
@@ -45,26 +45,26 @@ class CompilerCmd implements Callable<Integer> {
                 binaryName = outPath;
             }
 
-            Lexer lexer = new Lexer(input);
-            Parser parser = new Parser(lexer);
+            final Lexer lexer = new Lexer(input);
+            final Parser parser = new Parser(lexer);
 
-            ExprAST.FunctionAST mainFunction = parser.ParseDefinition();
+            final ExprAST.FunctionAST mainFunction = parser.ParseDefinition();
 
             if (mainFunction == null) {
                 System.err.println("Syntax error");
-                System.exit(1);
+                return 1;
             }
 
-            IRBuilder builder = new IRBuilder();
-            String llvmIR = mainFunction.Codegen(builder);
+            final IRBuilder builder = new IRBuilder();
+            final String llvmIR = mainFunction.Codegen(builder);
 
             if (llvmIR == null) {
                 System.err.println("Error building the IR");
-                System.exit(1);
+                return 1;
             }
 
             System.out.println(llvmIR);
-            File irFile = new File(llFilePath);
+            final File irFile = new File(llFilePath);
             Files.writeString(irFile.toPath(), llvmIR);
             System.out.println("File IR built successfully: " + llFilePath);
 
@@ -79,34 +79,32 @@ class CompilerCmd implements Callable<Integer> {
     }
 
     private static void compileToBinary(String llFilePath, String outputBinaryName) {
-        System.out.println("Clang launching...");
+        System.out.println("Launching Clang...");
 
-        ProcessBuilder processBuilder = createProcessBuilder(llFilePath, outputBinaryName);
+        final ProcessBuilder processBuilder = createProcessBuilder(llFilePath, outputBinaryName);
 
         try {
-            Process process = processBuilder.start();
-            int exitCode = process.waitFor();
+            final Process process = processBuilder.start();
+            final int exitCode = process.waitFor();
 
             if (exitCode == 0) {
-                System.out.println("✅ Executable created: ./" + outputBinaryName);
+                System.out.println("Executable created: ./" + outputBinaryName);
             } else {
-                System.err.println("❌ Error during compilation. Exit code: " + exitCode);
+                System.err.println("Error during compilation. Exit code: " + exitCode);
             }
         } catch (IOException | InterruptedException e) {
-            System.err.println("Fail to launch Clang");
+            System.err.println("Failed to launch Clang");
             e.printStackTrace();
         }
     }
 
     private static ProcessBuilder createProcessBuilder(String llFilePath, String outputBinaryName) {
-        ProcessBuilder processBuilder = new ProcessBuilder(
+        final ProcessBuilder processBuilder = new ProcessBuilder(
                 "clang",
                 "-O3",
                 "-flto",
                 "-march=native",
-                "-fprofile-instr-generate", // next -fprofile-instr-use if PGO
                 "-funroll-loops",
-                //"-fprefetch-loop-arrays", for some reason it's unsupported
                 "-fno-rtti",
                 "-fno-exceptions",
                 "-mtune=native",
@@ -118,7 +116,6 @@ class CompilerCmd implements Callable<Integer> {
         processBuilder.inheritIO();
         return processBuilder;
     }
-
 }
 
 public class Main {
