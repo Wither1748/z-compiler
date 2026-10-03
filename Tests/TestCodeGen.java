@@ -131,4 +131,22 @@ public class TestCodeGen {
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
+
+    @Test
+    public void testConstantDefinitionWithDifferentTypes() throws IOException {
+        final String code = "proc main() {\n cn int32 const -> 3\n cn flt32 floatConst -> 1.0\n ret 0}";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %const = alloca i32\n store i32 3, ptr %const\n %floatConst = alloca float\n store float 1, ptr %floatConst\n ret i32 0\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
+
+    @Test
+    public void testConstantDefinitionWithRet() throws IOException {
+        final String code = "proc main() {\n cn int32 const -> 3\n cn flt32 floatConst -> 1.0\n ret const}";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %const = alloca i32\n store i32 3, ptr %const\n %floatConst = alloca float\n store float 1, ptr %floatConst\n %1 = load i32, ptr %const\n ret i32 %1\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
 }
