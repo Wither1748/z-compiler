@@ -15,6 +15,7 @@ public abstract class ExprAST {
      * Symbol table to store the symbols
      */
     protected static SymbolTable symbolTable = new SymbolTable();
+    protected static java.util.Map<String, PrototypeAST> functionSignatures = new java.util.HashMap<>();
 
     ExprAST() {}
 
@@ -288,14 +289,36 @@ public abstract class ExprAST {
          */
         public final String Codegen(final IRBuilder builder) {
             final List<String> argRegs = new ArrayList<>();
-            for (ExprAST arg : args) {
-                final String argReg = arg.Codegen(builder);
+            final PrototypeAST sig = functionSignatures.get(callee);
+
+            for (int i = 0; i < args.size(); i++) {
+                final String argReg = args.get(i).Codegen(builder);
                 if (argReg == null) return null;
-                argRegs.add("double " + argReg);
+
+                String argType = "double";
+                if (sig != null && i < sig.getParams().size()) {
+                    argType = Types.getLlvmType(sig.getParams().get(i).type);
+                }
+                argRegs.add(argType + " " + argReg);
             }
+
             final String resultReg = builder.nextRegister();
-            builder.appendLine(resultReg + " = call double @" + callee + "(" + String.join(", ", argRegs) + ")");
+            final String retType = callee.equals("main") ? "i32" : "double";
+            builder.appendLine(resultReg + " = call " + retType + " @" + callee + "(" + String.join(", ", argRegs) + ")");
             return resultReg;
+        }
+    }
+
+    /**
+     * Parameter: a type + a name. Used by PrototypeAST.
+     */
+    public static class Param {
+        public final String type;   // Z type, e.g. "int32"
+        public final String name;   // parameter name
+
+        public Param(final String type, final String name) {
+            this.type = type;
+            this.name = name;
         }
     }
 
@@ -303,35 +326,18 @@ public abstract class ExprAST {
      * Prototype class, gets called in case of a PROTO token (es. proc)
      */
     public static class PrototypeAST extends ExprAST {
-        /**
-         * name is the name of the function
-         * args is a list of arguments
-         */
         private final String name;
-        private final List<String> args;
+        private final List<Param> params;
 
-        /**
-         * Constructor for a prototype
-         * @param name name of the function
-         * @param args list of args
-         */
-        public PrototypeAST(final String name, final List<String> args) {
+        public PrototypeAST(final String name, final List<Param> params) {
             this.name = name;
-            this.args = args;
+            this.params = params;
         }
 
-        /**
-         * getter method for a prototype
-         * @return name of the function
-         */
         public final String getName() { return name; }
+        public final List<Param> getParams() { return params; }
 
         @Override
-        /**
-         * Generates code for a Prototype
-         * @param builder IRbuilder to generate code
-         * @return empty string
-         */
         public final String Codegen(final IRBuilder builder) {
             return "";
         }
@@ -448,14 +454,39 @@ public abstract class ExprAST {
             final String retType = isMain ? "i32" : "double";
             final String linkage = isMain ? "dso_local" : "private dso_local";
 
-            functionIR.append("define ").append(linkage).append(" ").append(retType).append(" @").append(proto.getName()).append("() {\n");
+            // Build parameter list: e.g. "i32 %x, i32 %y"
+            final StringBuilder paramList = new StringBuilder();
+            final List<PrototypeAST.Param> params = proto.getParams();
+            for (int i = 0; i < params.size(); i++) {
+                if (i > 0) paramList.append(", ");
+                final PrototypeAST.Param p = params.get(i);
+                paramList.append(Types.getLlvmType(p.type)).append(" %").append(p.name);
+            }
+
+            functionIR.append("define ").append(linkage).append(" ").append(retType)
+                    .append(" @").append(proto.getName())
+                    .append("(").append(paramList).append(") {\n");
             functionIR.append("entry:\n");
+
+            // Register signature so calls can look it up.
+            functionSignatures.put(proto.getName(), proto);
+
+            // Allocate each parameter and store the incoming value.
+            for (PrototypeAST.Param p : params) {
+                final String llvmT = Types.getLlvmType(p.type);
+                final String addrName = p.name + ".addr";
+                final String ptr = builder.emitAlloca(addrName, llvmT);
+                builder.emitStore("%" + p.name, llvmT, ptr);
+                symbolTable.define(p.name, new SymbolTable.SymbolInfo(
+                        p.name, llvmT, ptr, false));
+            }
 
             final String retVal = body.Codegen(builder);
 
             if (retVal != null) {
                 functionIR.append(builder.getIR());
                 if (isMain) {
+
                     // Check if retVal is an integer literal (including decimal representations like 0.0)
                     if (retVal.matches("-?\\d+\\.0+")) {
                         functionIR.append(" ret i32 ").append(retVal.substring(0, retVal.indexOf('.'))).append("\n");
