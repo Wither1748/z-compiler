@@ -368,30 +368,58 @@ public class Parser {
      * @return an error or a PrototypeAST node
      * @throws IOException
      */
-    public final  ExprAST.PrototypeAST ParsePrototype() throws IOException {
+    public final ExprAST.PrototypeAST ParsePrototype() throws IOException {
         if (curTok != Lexer.Tokens.IDENTIFIER.value) {
             return ExprAST.LogErrorP("Expected function name in prototype");
         }
-
         final String fnName = lex.IdentifierStr;
         Next();
 
-        final List<String> argNames = new ArrayList<>();
+        // Expect '('
+        if (curTok != Lexer.Tokens.OPEN_PAR.value) {
+            return ExprAST.LogErrorP("Expected '(' in prototype");
+        }
+        Next();
 
+        final List<ExprAST.Param> params = new ArrayList<>();
         if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
-            while (Next() == Lexer.Tokens.IDENTIFIER.value) {
-                argNames.add(lex.IdentifierStr);
+            while (true) {
+                // 1. Parse type
+                final Lexer.Tokens typeTok = Lexer.Tokens.fromValues(curTok);
+                if (typeTok == null || !isTypeToken(typeTok)) {
+                    return ExprAST.LogErrorP("Expected parameter type");
+                }
+                final String paramType = typeTok.description;
+                Next();
+
+                // 2. Parse name
+                if (curTok != Lexer.Tokens.IDENTIFIER.value) {
+                    return ExprAST.LogErrorP("Expected parameter name");
+                }
+                final String paramName = lex.IdentifierStr;
+                Next();
+
+                params.add(new ExprAST.Param(paramType, paramName));
+
+                // 3. '|' means more params, ')' means end
+                if (curTok == Lexer.Tokens.PARAMS.value) {
+                    Next();
+                    continue;
+                }
+                if (curTok == Lexer.Tokens.CLOSE_PAR.value) {
+                    break;
+                }
+                return ExprAST.LogErrorP("Expected '|' or ')' in parameter list");
             }
         }
 
         if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
             return ExprAST.LogErrorP("Expected ')' in prototype");
         }
-
         Next();
         functionCount.put(fnName, 0);
 
-        return new ExprAST.PrototypeAST(fnName, argNames);
+        return new ExprAST.PrototypeAST(fnName, params);
     }
 
     /**
