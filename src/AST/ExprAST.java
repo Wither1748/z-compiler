@@ -97,6 +97,9 @@ public abstract class ExprAST {
          * @return value of the number
          */
         public String Codegen(final IRBuilder builder) {
+            if (val == (long) val) {
+                return String.valueOf((long) val);
+            }
             return String.valueOf(val);
         }
     }
@@ -150,6 +153,7 @@ public abstract class ExprAST {
             this.name = idName;
             this.type = "flt64";
             this.value = null;
+            this.info = null;
         }
 
         /**
@@ -167,32 +171,33 @@ public abstract class ExprAST {
          * @return value of the variable
          */
         public final String Codegen(final IRBuilder builder) {
-            final SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
-            if (existing != null) {
-                // reference to an existing variable
+            if (this.info == null) {
+                // use of a variable
+                final SymbolTable.SymbolInfo existing = symbolTable.lookup(name);
+                if (existing == null) {
+                    ExprAST.LogErrorV("Variabile non dichiarata: " + name);
+                    return null;
+                }
                 return builder.emitLoad(existing.getLlvmType(), existing.getPointerReg());
-            }
+            } else {
+                // new variable
+                final boolean result = symbolTable.define(name, this.info);
+                if (!result) {
+                    ExprAST.LogErrorV("Shadowing o ridichiarazione della variabile nello scope: " + name);
+                    return null;
+                }
 
-            // definining a new var
-            final boolean result = symbolTable.define(name, this.info);
-            if (!result) {
-                ExprAST.LogErrorV("Shadowing or redeclaration of variable in current scope: " + name);
-            }
-            final String llvmType = info != null ? info.getLlvmType() : "double";
-            final String ptr = builder.emitAlloca(name, llvmType);
-            if (value != null) {
-                String valReg;
-                if (value instanceof NumberExprAST && !llvmType.equals("double") && !llvmType.equals("float")) {
-                    // Convert default value to integer literal for integer types
-                    valReg = String.valueOf(((NumberExprAST) value).getIntVal());
-                } else {
-                    valReg = value.Codegen(builder);
+                final String llvmType = info.getLlvmType();
+                final String ptr = builder.emitAlloca(name, llvmType);
+
+                if (value != null) {
+                    String valReg = value.Codegen(builder);
+                    if (valReg != null) {
+                        builder.emitStore(valReg, llvmType, ptr);
+                    }
                 }
-                if (valReg != null) {
-                    builder.emitStore(valReg, llvmType, ptr);
-                }
+                return ptr;
             }
-            return ptr;
         }
     }
 
@@ -233,29 +238,53 @@ public abstract class ExprAST {
 
             if (leftVal == null || rightVal == null) return null;
 
+            String leftType = builder.getRegisterType(leftVal);
+            if (leftType == null) {
+                leftType = leftVal.contains(".") ? "double" : "i32";
+            }
+
+            boolean isFloat = leftType.equals("double") || leftType.equals("float");
             final String resultReg = builder.nextRegister();
+
             switch (op) {
                 case '+':
-                    builder.appendLine(resultReg + " = fadd double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fadd " : "add ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '-':
-                    builder.appendLine(resultReg + " = fsub double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fsub " : "sub ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '*':
-                    builder.appendLine(resultReg + " = fmul double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fmul " : "mul ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '/':
-                    builder.appendLine(resultReg + " = fdiv double " + leftVal + ", " + rightVal);
+                    builder.appendLine(resultReg + " = " + (isFloat ? "fdiv " : "sdiv ") + leftType + " " + leftVal + ", " + rightVal);
                     break;
                 case '<':
-                    final String cmpReg = builder.nextRegister();
-                    builder.appendLine(cmpReg + " = fcmp olt double " + leftVal + ", " + rightVal);
-                    builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to double");
+                    String cmpReg = builder.nextRegister();
+                    if (isFloat) {
+                        builder.appendLine(cmpReg + " = fcmp olt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to " + leftType);
+                    } else {
+                        builder.appendLine(cmpReg + " = icmp slt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = zext i1 " + cmpReg + " to " + leftType);
+                    }
+                    break;
+                case '>':
+                    cmpReg = builder.nextRegister();
+                    if (isFloat) {
+                        builder.appendLine(cmpReg + " = fcmp ogt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = uitofp i1 " + cmpReg + " to " + leftType);
+                    } else {
+                        builder.appendLine(cmpReg + " = icmp sgt " + leftType + " " + leftVal + ", " + rightVal);
+                        builder.appendLine(resultReg + " = zext i1 " + cmpReg + " to " + leftType);
+                    }
                     break;
                 default:
-                    System.err.println("Unsupported operation: " + op);
+                    System.err.println("Operazione non supportata: " + op);
                     return null;
             }
+
+            builder.setRegisterType(resultReg, leftType);
             return resultReg;
         }
     }
@@ -304,17 +333,15 @@ public abstract class ExprAST {
 
             final String resultReg = builder.nextRegister();
             final String retType = callee.equals("main") ? "i32" : "double";
-            builder.appendLine(resultReg + " = call " + retType + " @" + callee + "(" + String.join(", ", argRegs) + ")");
+            builder.appendLine(resultReg + " = call " + retType + " @" + callee
+                    + "(" + String.join(", ", argRegs) + ")");
             return resultReg;
         }
     }
 
-    /**
-     * Parameter: a type + a name. Used by PrototypeAST.
-     */
     public static class Param {
-        public final String type;   // Z type, e.g. "int32"
-        public final String name;   // parameter name
+        public final String type;
+        public final String name;
 
         public Param(final String type, final String name) {
             this.type = type;
@@ -326,18 +353,41 @@ public abstract class ExprAST {
      * Prototype class, gets called in case of a PROTO token (es. proc)
      */
     public static class PrototypeAST extends ExprAST {
+        /**
+         * name is the name of the function
+         * params is a list of parameters (type + name)
+         */
         private final String name;
         private final List<Param> params;
 
+        /**
+         * Constructor for a prototype
+         * @param name name of the function
+         * @param params list of parameters
+         */
         public PrototypeAST(final String name, final List<Param> params) {
             this.name = name;
             this.params = params;
         }
 
+        /**
+         * getter method for a prototype name
+         * @return name of the function
+         */
         public final String getName() { return name; }
+
+        /**
+         * getter method for the prototype parameters
+         * @return list of parameters
+         */
         public final List<Param> getParams() { return params; }
 
         @Override
+        /**
+         * Generates code for a Prototype
+         * @param builder IRbuilder to generate code
+         * @return empty string
+         */
         public final String Codegen(final IRBuilder builder) {
             return "";
         }
@@ -450,11 +500,11 @@ public abstract class ExprAST {
             symbolTable.enterScope();
 
             final StringBuilder functionIR = new StringBuilder();
-            boolean isMain = proto.getName().equals("main");
+            final boolean isMain = proto.getName().equals("main");
             final String retType = isMain ? "i32" : "double";
             final String linkage = isMain ? "dso_local" : "private dso_local";
 
-            // Build parameter list: e.g. "i32 %x, i32 %y"
+            // Build parameter list: "i32 %x, i32 %y"
             final StringBuilder paramList = new StringBuilder();
             final List<PrototypeAST.Param> params = proto.getParams();
             for (int i = 0; i < params.size(); i++) {
@@ -486,12 +536,11 @@ public abstract class ExprAST {
             if (retVal != null) {
                 functionIR.append(builder.getIR());
                 if (isMain) {
-
                     // Check if retVal is an integer literal (including decimal representations like 0.0)
                     if (retVal.matches("-?\\d+\\.0+")) {
                         functionIR.append(" ret i32 ").append(retVal.substring(0, retVal.indexOf('.'))).append("\n");
                     } else if (retVal.matches("-?\\d+")) {
-                        functionIR.append("  ret i32 ").append(retVal).append("\n");
+                        functionIR.append(" ret i32 ").append(retVal).append("\n");
                     } else {
                         // Check if the register is already i32 type
                         final String regType = builder.getRegisterType(retVal);
@@ -557,10 +606,22 @@ public abstract class ExprAST {
          * @return the code for a constant
          */
         public final String Codegen(final IRBuilder builder) {
-            if (value != null) {
-                return value.Codegen(builder);
+            String llvmType = Types.getLlvmType(type);
+            SymbolTable.SymbolInfo info = new SymbolTable.SymbolInfo(name, llvmType, "%" + name, true);
+
+            if (!symbolTable.define(name, info)) {
+                ExprAST.LogErrorC("Constant redefinition: " + name);
+                return null;
             }
-            return "";
+
+            String ptr = builder.emitAlloca(name, llvmType);
+            if (value != null) {
+                String valReg = value.Codegen(builder);
+                if (valReg != null) {
+                    builder.emitStore(valReg, llvmType, ptr);
+                }
+            }
+            return ptr;
         }
     }
 }

@@ -54,7 +54,7 @@ public class TestCodeGen {
         final String code = "proc test() {\n 3+4 \n }";
 
         final String llvmIR = codeGen(code);
-        final String expected = "define private dso_local double @test() {\nentry:\n %1 = fadd double 3.0, 4.0\n ret double %1\n}\n";
+        final String expected = "define private dso_local double @test() {\nentry:\n %1 = add i32 3, 4\n ret double %1\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
@@ -63,7 +63,7 @@ public class TestCodeGen {
     public void testFunctionWithReturnStatement() throws IOException {
         final String code = "proc main() {\n ret 40 + 32 \n }";
         final String llvmIR = codeGen(code);
-        final String expected = "define dso_local i32 @main() {\nentry:\n %1 = fadd double 40.0, 32.0\n %2 = fptosi double %1 to i32\n ret i32 %2\n}\n";
+        final String expected = "define dso_local i32 @main() {\nentry:\n %1 = add i32 40, 32\n ret i32 %1\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
@@ -72,7 +72,7 @@ public class TestCodeGen {
     public void testFunctionWithReturnNonMain() throws IOException {
         final String code = "proc foo() {\n ret 10 * 2 \n }";
         final String llvmIR = codeGen(code);
-        final String expected = "define private dso_local double @foo() {\nentry:\n %1 = fmul double 10.0, 2.0\n ret double %1\n}\n";
+        final String expected = "define private dso_local double @foo() {\nentry:\n %1 = mul i32 10, 2\n ret double %1\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
@@ -126,7 +126,7 @@ public class TestCodeGen {
     public void testVarsWithDifferentTypesWithRet() throws IOException {
         final String code = "proc main() {\n int32 var -> 3\n flt32 var2 -> 4\n flt64 var3 -> 4\n ret var3\n }";
         final String llvmIR = codeGen(code);
-        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 3, ptr %var\n %var2 = alloca float\n store float 4.0, ptr %var2\n %var3 = alloca double\n store double 4.0, ptr %var3\n %1 = load double, ptr %var3\n %2 = fptosi double %1 to i32\n ret i32 %2\n}\n";
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 3, ptr %var\n %var2 = alloca float\n store float 4, ptr %var2\n %var3 = alloca double\n store double 4, ptr %var3\n %1 = load double, ptr %var3\n %2 = fptosi double %1 to i32\n ret i32 %2\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
@@ -144,13 +144,11 @@ public class TestCodeGen {
         final String code = "proc foo(int32 x | int32 y) {\n ret 0 \n }";
         final String llvmIR = codeGen(code);
         assertNotNull(llvmIR);
-        // Signature must carry the LLVM types and parameter names.
         assertTrue(llvmIR.contains("@foo(i32 %x, i32 %y)"));
     }
 
     @Test
     public void testCallWithParameters() throws IOException {
-        // Two functions in one file: foo (callee) then main (caller).
         final String code = "proc foo(int32 x | int32 y) {\n ret 0 \n }\n"
                 + "proc main() {\n foo(1 | 2) \n ret 0 \n }";
 
@@ -159,16 +157,13 @@ public class TestCodeGen {
         final Lexer lexer = new Lexer(input);
         final Parser parser = new Parser(lexer);
 
-        // Parse and codegen foo first, so its signature is registered.
         final ExprAST.FunctionAST foo = parser.ParseDefinition();
         foo.Codegen(new IRBuilder());
 
-        // Parse and codegen main; foo's signature is now available.
         final ExprAST.FunctionAST main = parser.ParseDefinition();
         final String llvmIR = main.Codegen(new IRBuilder());
 
         assertNotNull(llvmIR);
-        // The callee's parameter types come from foo's signature (both i32).
         assertTrue(llvmIR.contains("call double @foo(i32 "));
     }
 }

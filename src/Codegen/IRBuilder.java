@@ -108,4 +108,14 @@ public class IRBuilder {
     public final String nextLabel(final String prefix) {
         return prefix + "." + (labelCount++);
     }
+
+
+    /**
+     * setter method for registerTypes
+     * @param reg name of the register
+     * @param type type to set
+     */
+    public void setRegisterType(final String reg, final String type) {
+        registerTypes.put(reg, type);
+    }
 }
