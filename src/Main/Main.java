@@ -42,19 +42,25 @@ class CompilerCmd implements Callable<Integer> {
 
             final String llFilePath;
             final String binaryName;
+            final String optFilePath;
+
             if (outPath == null) {
                 llFilePath = "output.ll";
+                optFilePath = "output_opt.ll";
                 binaryName = "output";
             } else if (outPath.endsWith(".ll")) {
                 llFilePath = outPath;
+                optFilePath = outPath.substring(0, outPath.length() - 3) + "_opt.ll";
                 binaryName = outPath.substring(0, outPath.length() - 3);
             } else {
                 llFilePath = outPath + ".ll";
+                optFilePath = outPath + "_opt.ll";
                 binaryName = outPath;
             }
 
             final Lexer lexer = new Lexer(input);
             final Parser parser = new Parser(lexer);
+            final IRBuilder builder = new IRBuilder();
 
             final ExprAST.FunctionAST mainFunction = parser.ParseDefinition();
 
@@ -63,7 +69,6 @@ class CompilerCmd implements Callable<Integer> {
                 return 1;
             }
 
-            final IRBuilder builder = new IRBuilder();
             final String llvmIR = mainFunction.Codegen(builder);
 
             if (llvmIR == null) {
@@ -71,18 +76,58 @@ class CompilerCmd implements Callable<Integer> {
                 return 1;
             }
 
-            System.out.println(llvmIR);
             final File irFile = new File(llFilePath);
             Files.writeString(irFile.toPath(), llvmIR);
-            System.out.println("File IR built successfully: " + llFilePath);
+            System.out.println("Raw IR built successfully: " + llFilePath);
 
-            compileToBinary(irFile.getAbsolutePath(), binaryName);
+            // opt passes
+            boolean optSuccess = runOptPasses(llFilePath, optFilePath);
+            String finalIrFile = optSuccess ? optFilePath : llFilePath;
+
+            // compilation
+            compileToBinary(new File(finalIrFile).getAbsolutePath(), binaryName);
 
             return 0;
 
         } catch (IOException e) {
             e.printStackTrace();
             return 1;
+        }
+    }
+
+    /**
+     * Run LLVM optimization passes using checks
+     * @param inputLl LLVM IR input
+     * @param outputLl LLVM IR output
+     * @return true if the optimization passes were successful, false otherwise
+     */
+    private static boolean runOptPasses(String inputLl, String outputLl) {
+        System.out.println("Running LLVM Optimization passes...");
+        ProcessBuilder processBuilder = new ProcessBuilder(
+                "opt",
+                "-O3",
+                "-S",             // maintains a readable output
+                inputLl,
+                "-o",
+                outputLl
+        );
+
+        processBuilder.inheritIO();
+
+        try {
+            Process process = processBuilder.start();
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                System.out.println("Optimized IR saved to: " + outputLl);
+                return true;
+            } else {
+                System.err.println("Opt tool failed with exit code " + exitCode + ". Proceeding with raw IR.");
+                return false;
+            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Failed to launch 'opt' tool. Is it installed and in your PATH? idiot. Do sudo apt install opt");
+            return false;
         }
     }
 
