@@ -10,8 +10,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TestCodeGen {
 
@@ -148,5 +147,38 @@ public class TestCodeGen {
         final String expected = "define dso_local i32 @main() {\nentry:\n %const = alloca i32\n store i32 3, ptr %const\n %floatConst = alloca float\n store float 1, ptr %floatConst\n %1 = load i32, ptr %const\n ret i32 %1\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
+    public void testFunctionCallInsideMain() throws IOException {
+        final String code = "proc main() {\n foo() \n ret 0 \n }";
+        final String llvmIR = codeGen(code);
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("call double @foo()"));
+    }
+
+    @Test
+    public void testFunctionWithParameters() throws IOException {
+        final String code = "proc foo(int32 x | int32 y) {\n ret 0 \n }";
+        final String llvmIR = codeGen(code);
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("@foo(i32 %x, i32 %y)"));
+    }
+
+    @Test
+    public void testCallWithParameters() throws IOException {
+        final String code = "proc foo(int32 x | int32 y) {\n ret 0 \n }\n"
+                + "proc main() {\n foo(1 | 2) \n ret 0 \n }";
+
+        final InputStream input =
+                new ByteArrayInputStream(code.getBytes(StandardCharsets.UTF_8));
+        final Lexer lexer = new Lexer(input);
+        final Parser parser = new Parser(lexer);
+
+        final ExprAST.FunctionAST foo = parser.ParseDefinition();
+        foo.Codegen(new IRBuilder());
+
+        final ExprAST.FunctionAST main = parser.ParseDefinition();
+        final String llvmIR = main.Codegen(new IRBuilder());
+
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("call double @foo(i32 "));
     }
 }
