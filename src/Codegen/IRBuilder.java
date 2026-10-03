@@ -1,5 +1,8 @@
 package src.Codegen;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Class with helper methods to generate LLVM IR code using testual strings
  */
@@ -7,9 +10,11 @@ public class IRBuilder {
     /**
      * registerCount stores the next available register (es. %1)
      * irCode is the StringBuilder for the code
+     * registerTypes stores the LLVM type of each register
      */
     private int registerCount = 1;
     private final StringBuilder irCode = new StringBuilder();
+    private final Map<String, String> registerTypes = new HashMap<>();
 
     /**
      * @return a string with the next register (es. %2)
@@ -47,6 +52,7 @@ public class IRBuilder {
     public void reset() {
         registerCount = 1;
         irCode.setLength(0);
+        registerTypes.clear();
     }
 
     /**
@@ -80,7 +86,17 @@ public class IRBuilder {
     public final String emitLoad(final String llvmType, final String ptr) {
         final String reg = nextRegister();
         appendLine(reg + " = load " + llvmType + ", ptr " + ptr);
+        registerTypes.put(reg, llvmType);
         return reg;
+    }
+
+    /**
+     * Gets the LLVM type of a register
+     * @param reg the register name (e.g., "%1")
+     * @return the LLVM type or null if not tracked
+     */
+    public final String getRegisterType(final String reg) {
+        return registerTypes.get(reg);
     }
 
     /**

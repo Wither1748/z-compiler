@@ -64,7 +64,7 @@ public class TestCodeGen {
     public void testFunctionWithReturnStatement() throws IOException {
         final String code = "proc main() {\n ret 40 + 32 \n }";
         final String llvmIR = codeGen(code);
-        final String expected = "define dso_local i32 @main() {\nentry:\n %1 = fadd double 40.0, 32.0\n  %2 = fptosi double %1 to i32\n  ret i32 %2\n}\n";
+        final String expected = "define dso_local i32 @main() {\nentry:\n %1 = fadd double 40.0, 32.0\n %2 = fptosi double %1 to i32\n ret i32 %2\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
@@ -81,9 +81,54 @@ public class TestCodeGen {
     @Test
     public void testVarsWithoutAssignment() throws IOException {
         final String code = "proc main() {\n int32 var \n ret 0 \n }";
-        String llvmIR = codeGen(code);
-        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n %1 = load i32, ptr %var\n ret i32 0\n}\n";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 0, ptr %var\n ret i32 0\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
-    } // TODO fix this
+    }
+
+    @Test
+    public void testVarsWithAssignment() throws IOException {
+        final String code = "proc main() {\n int32 var -> 3 \n ret 0 \n }";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 3, ptr %var\n ret i32 0\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
+
+    @Test
+    public void testVarsWithAssignmentWithRet() throws IOException {
+        final String code = "proc main() {\n int32 var -> 3 \n ret var \n }";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 3, ptr %var\n %1 = load i32, ptr %var\n ret i32 %1\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
+
+    @Test
+    public void testMoreVars() throws IOException {
+        final String code = "proc main() {\n int32 var\n int32 var2\n ret 0 \n }";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 0, ptr %var\n %var2 = alloca i32\n store i32 0, ptr %var2\n ret i32 0\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
+
+    @Test
+    public void testVarsWithDifferentIntegers() throws IOException {
+        final String code = "proc main() {\n int32 var -> 3\n int64 var2 -> 4\n ret 0\n }";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 3, ptr %var\n %var2 = alloca i64\n store i64 4, ptr %var2\n ret i32 0\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
+
+    @Test
+    public void testVarsWithDifferentTypesWithRet() throws IOException {
+        final String code = "proc main() {\n int32 var -> 3\n flt32 var2 -> 4\n flt64 var3 -> 4\n ret var3\n }";
+        final String llvmIR = codeGen(code);
+        final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n store i32 3, ptr %var\n %var2 = alloca float\n store float 4.0, ptr %var2\n %var3 = alloca double\n store double 4.0, ptr %var3\n %1 = load double, ptr %var3\n %2 = fptosi double %1 to i32\n ret i32 %2\n}\n";
+        assertNotNull(llvmIR);
+        assertEquals(expected, llvmIR);
+    }
 }
