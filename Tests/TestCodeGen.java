@@ -64,7 +64,7 @@ public class TestCodeGen {
     public void testFunctionWithReturnStatement() throws IOException {
         final String code = "proc main() {\n ret 40 + 32 \n }";
         final String llvmIR = codeGen(code);
-        final String expected = "define dso_local i32 @main() {\nentry:\n %1 = fadd double 40.0, 32.0\n  %2 = fptosi double %1 to i32\n  ret i32 %2\n}\n";
+        final String expected = "define dso_local i32 @main() {\nentry:\n %1 = fadd double 40.0, 32.0\n %2 = fptosi double %1 to i32\n ret i32 %2\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
     }
