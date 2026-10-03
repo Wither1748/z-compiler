@@ -78,12 +78,12 @@ public class TestCodeGen {
         assertEquals(expected, llvmIR);
     }
 
-    /*@Test
+    @Test
     public void testVarsWithoutAssignment() throws IOException {
         final String code = "proc main() {\n int32 var \n ret 0 \n }";
         String llvmIR = codeGen(code);
         final String expected = "define dso_local i32 @main() {\nentry:\n %var = alloca i32\n %1 = load i32, ptr %var\n ret i32 0\n}\n";
         assertNotNull(llvmIR);
         assertEquals(expected, llvmIR);
-    }*/ // TODO fix this
+    } // TODO fix this
 }
