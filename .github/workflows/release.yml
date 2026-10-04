@@ -3,11 +3,14 @@ name: Create Binary for Linux (Release)
 on:
   push:
     tags:
-      - 'v*' 
+      - 'v*'
+
+permissions:
+  contents: read
 
 jobs:
   build-native:
-    name: Compila binario nativo (GraalVM)
+    name: Compiles
     runs-on: ubuntu-latest
 
     steps:
