@@ -2,7 +2,7 @@
 
 ## Overview
 
-### What is the Lexer?**
+### What is the Lexer?
 The Lexer is the first component that receives the code written by the user.
 
 if the user write : x -> 10 + 20
@@ -20,11 +20,13 @@ ID   Assignment NUMBER  ADD    NUMBER
 ### What is the Token?
 A Token tells us what type of element a part of the source code is(The Lexer divides the source code into lexemes and identifies the Token type of each lexeme.)
 
+```text
 user code
 ↓
 (by the Lexer)
 ↓
 Tokens
+```
 
 ## Lexer Class
 
@@ -32,35 +34,35 @@ Tokens
 
 #### `LastChar`
 -**type** `int`
--**purpose** it is used to store the last char.
+-**purpose :** it is used to store the last char.
 
 #### `IdentifierStr`
 -**type** `String`
--**purpose** Stores the text of an identifier, such as a variable or function name.
+-**purpose :** Stores the text of an identifier, such as a variable or function name.
 
 #### `NumVal`
 -**type** `double`
--**purpose**Stores the value of a number token, such as `10` or `10.5`.
+-**purpose :**Stores the value of a number token, such as `10` or `10.5`.
 
 #### `input`
 - **type** `InputStream`
-- **purpose** Stores the input source that the Lexer reads from.
+- **purpose :** Stores the input source that the Lexer reads from.
 
 #### `keywordMap`
-- **type** `Map<String, Tokens>`
-- **purpose** Maps strings such as `"if"`, `"for"`, and `"+"` to their corresponding Tokens.
+- **type :** `Map<String, Tokens>`
+- **purpose :** Maps strings such as `"if"`, `"for"`, and `"+"` to their corresponding Tokens.
 
 ### Constructor
 
 #### `Lexer(InputStream input)`
 - **Parameter:** `InputStream input`
-- **Purpose:** Initializes the Lexer with the input source that will be read by the Lexer.
+- **Purpose :** Initializes the Lexer with the input source that will be read by the Lexer.
 
 ### Methods
 #### `GetTok()`
 - **Return type:** `int`
 - **Throws:** `IOException`
-- **Purpose:** Reads the next element from the input and identifies its corresponding Token type.
+- **Purpose :** Reads the next element from the input and identifies its corresponding Token type.
 - Skips whitespace.
 - Checks for the end of the input.
 - Identifies identifiers, numbers, operators, comments, and symbols.
@@ -76,18 +78,18 @@ Tokens
 
 #### `description`
 - **Type:** `String`
-- **Purpose:** Stores the text associated with the token.
+- **Purpose :** Stores the text associated with the token.
 
 #### `value`
 - **Type:** `int`
-- **Purpose:** Stores the integer value used to represent the token.
+- **Purpose :** Stores the integer value used to represent the token.
 
 ### Constructor
 
 #### `Tokens(String description, int value)`
 
 - **Parameters:** `String description`, `int value`
-- **Purpose:** Initializes each token with its description and integer value.
+- **Purpose :** Initializes each token with its description and integer value.
 - The constructor is called automatically by Java when the enum constants are initialized.
 
 ### Enum Initialization
@@ -150,5 +152,5 @@ The enum constants are initialized only once.
 
 - **Return type:** `Tokens`
 - **Parameter:** `int value`
-- **Purpose:** Finds and returns the token whose `value` matches the given integer.
+- **Purpose :** Finds and returns the token whose `value` matches the given integer.
 
