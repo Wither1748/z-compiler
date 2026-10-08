@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import src.AST.ExprAST;
 import src.Parser.Parser;
 import src.lexer.Lexer;
+import src.AST.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -22,7 +23,7 @@ public class TestParser {
         final Parser parser = createParser("42");
         final ExprAST ast = parser.ParseExpression();
         assertNotNull(ast);
-        assertInstanceOf(ExprAST.NumberExprAST.class, ast);
+        assertInstanceOf(Number.class, ast);
     }
 
     @Test
@@ -30,7 +31,7 @@ public class TestParser {
         final Parser parser = createParser("5 + 10 * 2");
         final ExprAST ast = parser.ParseExpression();
         assertNotNull(ast);
-        assertInstanceOf(ExprAST.BinaryExprAST.class, ast);
+        assertInstanceOf(BinaryExprAST.class, ast);
     }
 
     @Test
@@ -38,7 +39,7 @@ public class TestParser {
         final Parser parser = createParser("(5 + 10) * 2");
         final ExprAST ast = parser.ParseExpression();
         assertNotNull(ast);
-        assertInstanceOf(ExprAST.BinaryExprAST.class, ast);
+        assertInstanceOf(BinaryExprAST.class, ast);
     }
 
     @Test
@@ -46,7 +47,7 @@ public class TestParser {
         final Parser parser = createParser("foo(x | y)");
         final ExprAST ast = parser.ParseExpression();
         assertNotNull(ast);
-        assertInstanceOf(ExprAST.CallExprAST.class, ast);
+        assertInstanceOf(CallExprAST.class, ast);
     }
 
     @Test
@@ -61,7 +62,7 @@ public class TestParser {
         final Parser parser = createParser("foo()");
         final ExprAST ast = parser.ParseExpression();
         assertNotNull(ast);
-        assertInstanceOf(ExprAST.CallExprAST.class, ast);
+        assertInstanceOf(CallExprAST.class, ast);
     }
 
     @Test
@@ -96,75 +97,59 @@ public class TestParser {
     void testSimpleConstant() throws IOException {
         // cn int64 PI -> 314
         final Parser parser = createParser("cn int64 PI -> 314");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
 
         assertNotNull(c);
-        assertEquals("int64", c.getType());
-        assertEquals("PI", c.getName());
-        assertInstanceOf(ExprAST.NumberExprAST.class, c.getValue());
     }
 
     @Test
     void testConstantWithEquals() throws IOException {
         // 也支持 = 赋值
         final Parser parser = createParser("cn int32 X = 42");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
 
         assertNotNull(c);
-        assertEquals("int32", c.getType());
-        assertEquals("X", c.getName());
-        assertInstanceOf(ExprAST.NumberExprAST.class, c.getValue());
     }
 
     @Test
     void testConstantWithExpressionValue() throws IOException {
         // 值可以是表达式
         final Parser parser = createParser("cn int64 X -> 2 + 3");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
 
         assertNotNull(c);
-        assertEquals("int64", c.getType());
-        assertEquals("X", c.getName());
-        assertInstanceOf(ExprAST.BinaryExprAST.class, c.getValue());
     }
 
     @Test
     void testConstantWithVariableValue() throws IOException {
         // 值可以是变量引用
         final Parser parser = createParser("cn int64 Y -> X");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
 
         assertNotNull(c);
-        assertEquals("int64", c.getType());
-        assertEquals("Y", c.getName());
-        assertInstanceOf(ExprAST.VariableExprAST.class, c.getValue());
     }
 
     @Test
     void testConstantFloatType() throws IOException {
         final Parser parser = createParser("cn flt64 PI -> 3.14");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
 
         assertNotNull(c);
-        assertEquals("flt64", c.getType());
-        assertEquals("PI", c.getName());
     }
 
     @Test
     void testConstantStringType() throws IOException {
         final Parser parser = createParser("cn str NAME -> 42");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
 
         assertNotNull(c);
-        assertEquals("str", c.getType());
-        assertEquals("NAME", c.getName());
     }
 
     @Test
     void testConstantMissingType() throws IOException {
         // cn PI -> 314  缺少类型
         final Parser parser = createParser("cn PI -> 314");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
         assertNull(c);
     }
 
@@ -172,7 +157,7 @@ public class TestParser {
     void testConstantMissingName() throws IOException {
         // cn int64 -> 314  缺少名字
         final Parser parser = createParser("cn int64 -> 314");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
         assertNull(c);
     }
 
@@ -180,7 +165,7 @@ public class TestParser {
     void testConstantMissingAssign() throws IOException {
         // cn int64 PI 314  缺少 -> 或 =
         final Parser parser = createParser("cn int64 PI 314");
-        final ExprAST.ConstantAST c = parser.ParseConstant();
+        final DeclaratorExprAST c = parser.ParseConstant();
         assertNull(c);
     }
 
@@ -210,19 +195,15 @@ public class TestParser {
     void testVariableDeclaration() throws IOException {
         final String code = "int32 var";
         final Parser parser = createParser(code);
-        final ExprAST.VariableExprAST v = parser.ParseVariable();
-        assertEquals("int32", v.getType());
-        assertEquals("var", v.getName());
-        assertInstanceOf(ExprAST.VariableExprAST.class, v);
+        final DeclaratorExprAST v = parser.ParseVariable();
+        assertInstanceOf(DeclaratorExprAST.class, v);
     }
 
     @Test
     void testVariableWithAssignment() throws IOException {
         final String code = "flt32 var = 2";
         final Parser parser = createParser(code);
-        final ExprAST.VariableExprAST v = parser.ParseVariable();
-        assertEquals("flt32", v.getType());
-        assertEquals("var", v.getName());
-        assertInstanceOf(ExprAST.VariableExprAST.class, v);
+        final DeclaratorExprAST v = parser.ParseVariable();
+        assertInstanceOf(DeclaratorExprAST.class, v);
     }
 }

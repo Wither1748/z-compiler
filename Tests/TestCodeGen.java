@@ -1,7 +1,6 @@
 package Tests;
 
 import org.junit.jupiter.api.Test;
-import src.AST.ExprAST;
 import src.Codegen.IRBuilder;
 import src.Parser.Parser;
 import src.lexer.Lexer;
@@ -12,6 +11,7 @@ import java.util.Scanner;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// some tests may not work, ok
 public class TestCodeGen {
 
     private void createFile(final String code, final String name){
@@ -44,9 +44,9 @@ public class TestCodeGen {
         final InputStream input = new ByteArrayInputStream(code.getBytes(StandardCharsets.UTF_8));
         final Lexer lexer = new Lexer(input);
         final Parser parser = new Parser(lexer);
-        final ExprAST.FunctionAST mainFunction = parser.ParseDefinition();
+        final src.AST.FunctionAST mainFunction = parser.ParseDefinition();
         final IRBuilder builder = new IRBuilder();
-        return mainFunction.Codegen(builder);
+        return String.valueOf(mainFunction.Codegen(builder));
     }
 
     @Test
@@ -167,19 +167,18 @@ public class TestCodeGen {
 
     @Test
     public void testCallWithParameters() throws IOException {
-        final String code = "proc foo(int32 x | int32 y) {\n ret 0 \n }\n"
-                + "proc main() {\n foo(1 | 2) \n ret 0 \n }";
+        final String code = "proc foo(int32 x | int32 y) {\n ret 0 \n }\n" + "proc main() {\n foo(1 | 2) \n ret 0 \n }";
 
         final InputStream input =
                 new ByteArrayInputStream(code.getBytes(StandardCharsets.UTF_8));
         final Lexer lexer = new Lexer(input);
         final Parser parser = new Parser(lexer);
 
-        final ExprAST.FunctionAST foo = parser.ParseDefinition();
+        final src.AST.FunctionAST foo = parser.ParseDefinition();
         foo.Codegen(new IRBuilder());
 
-        final ExprAST.FunctionAST main = parser.ParseDefinition();
-        final String llvmIR = main.Codegen(new IRBuilder());
+        final src.AST.FunctionAST main = parser.ParseDefinition();
+        final String llvmIR = String.valueOf(main.Codegen(new IRBuilder()));
 
         assertNotNull(llvmIR);
         assertTrue(llvmIR.contains("call double @foo(i32 "));

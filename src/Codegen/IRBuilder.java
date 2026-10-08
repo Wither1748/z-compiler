@@ -1,5 +1,8 @@
 package src.Codegen;
 
+import src.AST.PrototypeAST;
+import src.AST.Value;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,6 +18,70 @@ public class IRBuilder {
     private int registerCount = 1;
     private final StringBuilder irCode = new StringBuilder();
     private final Map<String, String> registerTypes = new HashMap<>();
+
+    /**
+     * The names visible to the function being generated.
+     *
+     */
+    private final SymbolTable symbols = new SymbolTable();
+
+    /**
+     * Every function signature seen so far, so a call can be typed and checked.
+     *
+     */
+    private final Map<String, PrototypeAST> signatures = new java.util.HashMap<>();
+
+    private boolean terminated;
+    private String returnType = "double";
+
+    public void emitReturn(final Value value) {
+        final String target = returnType;
+        final String from = value.type().llvm();
+        if (from.equals(target)) {
+            appendLine("ret " + target + " " + value.text());
+            terminated = true;
+            return;
+        }
+        final String converted = nextRegister();
+        appendLine(converted + " = " + conversionOpcode(value.type().llvm(), target) + from + " " + value.text() + " to " + target);
+        appendLine("ret " + target + " " + converted);
+        terminated = true;
+    }
+
+    /** Emits a terminator that has no operand, such as a {@code main} that fell off the end. */
+    public void emitBareReturn(final String literal) {
+        appendLine("ret " + literal);
+        terminated = true;
+    }
+
+    private static String conversionOpcode(final String from, final String to) {
+        final boolean fromFloat = from.equals("float") || from.equals("double");
+        final boolean toFloat = to.equals("float") || to.equals("double");
+        if (fromFloat && !toFloat) return "fptosi ";
+        if (!fromFloat && toFloat) return "sitofp ";
+        if (fromFloat) return to.equals("float") ? "fptrunc " : "fpext ";
+        return from.equals("i64") && to.equals("i32") ? "trunc " : "sext ";
+    }
+
+    /** @return whether the current block already has a terminator */
+    public boolean isTerminated() {
+        return terminated;
+    }
+
+    /** Declares what the function being generated returns. */
+    public void setReturnType(final String llvmType) {
+        this.returnType = llvmType;
+    }
+
+    /** @return the symbol table for the function being generated */
+    public SymbolTable symbols() {
+        return symbols;
+    }
+
+    /** @return the signatures of the functions generated so far */
+    public Map<String, PrototypeAST> signatures() {
+        return signatures;
+    }
 
     /**
      * @return a string with the next register (es. %2)
@@ -53,6 +120,7 @@ public class IRBuilder {
         registerCount = 1;
         irCode.setLength(0);
         registerTypes.clear();
+        terminated = false;
     }
 
     /**

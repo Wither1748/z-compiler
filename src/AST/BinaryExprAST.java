@@ -1,0 +1,95 @@
+package src.AST;
+
+import src.Codegen.IRBuilder;
+import src.Parser.ZType;
+
+
+public final class BinaryExprAST extends ExprAST {
+
+    private final char op;
+    private final ExprAST left;
+    private final ExprAST right;
+
+    public BinaryExprAST(final char op, final ExprAST left, final ExprAST right) {
+        this.op = op;
+        this.left = left;
+        this.right = right;
+    }
+
+    /** @return the operator character as written in the source */
+    public char operator() {
+        return op;
+    }
+
+    private boolean isComparison() {
+        return op == '<' || op == '>';
+    }
+
+    private ZType operandType(final IRBuilder builder) {
+        final ZType a = left.type(builder);
+        final ZType b = right.type(builder);
+        try {
+            return ZType.unify(a, b);
+        } catch (final IllegalArgumentException e) {
+            System.err.println("Error: " + e.getMessage());
+            return a;
+        }
+    }
+
+    @Override
+    public ZType type(final IRBuilder builder) {
+        return isComparison() ? ZType.BOOL : operandType(builder);
+    }
+
+    @Override
+    public Value Codegen(final IRBuilder builder) {
+        final Value lhs = left.Codegen(builder);
+        if (lhs == null) return null;
+        final Value rhs = right.Codegen(builder);
+        if (rhs == null) return null;
+
+        final ZType common = operandType(builder);
+        final Value a = coerce(builder, lhs, common);
+        final Value b = coerce(builder, rhs, common);
+        if (a == null || b == null) return null;
+
+        if (isComparison()) {
+            final boolean ordered = a.type().isFloat();
+            final String compared = builder.nextRegister();
+            builder.appendLine(compared + " = " + (ordered ? "fcmp " : "icmp ") + predicate(ordered) + " " + a.type().llvm() + " " + a.text() + ", " + b.text());
+            final String result = builder.nextRegister();
+            builder.appendLine(result + " = zext i1 " + compared + " to i32");
+            builder.setRegisterType(result, ZType.INT32.llvm());
+            return new Value(result, ZType.BOOL);
+        }
+
+        final String opcode = arithmeticOpcode(a.type());
+        if (opcode == null) {
+            System.err.println("Operazione non supportata: " + op);
+            return null;
+        }
+        final String result = builder.nextRegister();
+        builder.appendLine(result + " = " + opcode + " " + a.type().llvm() + " " + a.text() + ", " + b.text());
+        builder.setRegisterType(result, a.type().llvm());
+        return new Value(result, a.type());
+    }
+
+    private String predicate(final boolean ordered) {
+        return switch (op) {
+            case '<' -> ordered ? "olt" : "slt";
+            case '>' -> ordered ? "ogt" : "sgt";
+            default -> throw new IllegalStateException("not a comparison: " + op);
+        };
+    }
+
+    private String arithmeticOpcode(final ZType type) {
+        final String prefix = type.isFloat() ? "f" : "";
+        return switch (op) {
+            case '+' -> prefix + "add";
+            case '-' -> prefix + "sub";
+            case '*' -> prefix + "mul";
+            case '/' -> prefix + "div";
+            default -> null;
+        };
+    }
+}
