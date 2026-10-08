@@ -21,6 +21,16 @@ public final class BinaryExprAST extends ExprAST {
         return op;
     }
 
+    /** @return the left operand */
+    public ExprAST left() {
+        return left;
+    }
+
+    /** @return the right operand */
+    public ExprAST right() {
+        return right;
+    }
+
     private boolean isComparison() {
         return op == '<' || op == '>';
     }

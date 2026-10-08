@@ -35,7 +35,7 @@ eif
 
 else
 
-for (type name | cond | op) {
+for (type name -> init | cond | op) {
 
 }
 

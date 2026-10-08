@@ -46,7 +46,8 @@ public class TestCodeGen {
         final Parser parser = new Parser(lexer);
         final src.AST.FunctionAST mainFunction = parser.ParseDefinition();
         final IRBuilder builder = new IRBuilder();
-        return String.valueOf(mainFunction.Codegen(builder));
+        final src.AST.Value result = mainFunction.Codegen(builder);
+        return result == null ? null : result.text();
     }
 
     @Test
@@ -182,5 +183,24 @@ public class TestCodeGen {
 
         assertNotNull(llvmIR);
         assertTrue(llvmIR.contains("call double @foo(i32 "));
+    }
+
+    @Test
+    public void testSimpleForLoop() throws IOException {
+        final String code = "proc main() {\n"
+                + "  for (int32 i -> 0 | i < 10 | i + 1) {\n"
+                + "    int32 x -> 5\n"
+                + "  }\n"
+                + "  ret 0\n"
+                + "}";
+
+        final String llvmIR = codeGen(code);
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("for.cond"));
+        assertTrue(llvmIR.contains("for.body"));
+        assertTrue(llvmIR.contains("for.inc"));
+        assertTrue(llvmIR.contains("for.end"));
+        assertTrue(llvmIR.contains("icmp slt i32"));
+        assertTrue(llvmIR.contains("br i1"));
     }
 }
