@@ -2,15 +2,18 @@ package src.Main;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import src.AST.ExprAST;
+import src.AST.FunctionAST;
+import src.AST.Value;
 import src.Codegen.IRBuilder;
 import src.Parser.Parser;
 import src.lexer.Lexer;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.concurrent.Callable;
@@ -60,19 +63,10 @@ class CompilerCmd implements Callable<Integer> {
 
             final Lexer lexer = new Lexer(input);
             final Parser parser = new Parser(lexer);
-            final IRBuilder builder = new IRBuilder();
 
-            final ExprAST.FunctionAST mainFunction = parser.ParseDefinition();
-
-            if (mainFunction == null) {
-                System.err.println("Syntax error");
-                return 1;
-            }
-
-            final String llvmIR = mainFunction.Codegen(builder);
+            final String llvmIR = generateModule(parser, lexer);
 
             if (llvmIR == null) {
-                System.err.println("Error building the IR");
                 return 1;
             }
 
@@ -82,17 +76,70 @@ class CompilerCmd implements Callable<Integer> {
 
             // opt passes
             boolean optSuccess = runOptPasses(llFilePath, optFilePath);
-            String finalIrFile = optSuccess ? optFilePath : llFilePath;
+            if (!optSuccess) {
+                return 1;
+            }
 
             // compilation
-            compileToBinary(new File(finalIrFile).getAbsolutePath(), binaryName);
-
-            return 0;
+            return compileToBinary(new File(optFilePath).getAbsolutePath(), binaryName);
 
         } catch (IOException e) {
             e.printStackTrace();
             return 1;
         }
+    }
+
+    /**
+     * Generates every function in the file, in the order they were written.
+     *
+     * @param parser the parser, positioned on the next token
+     * @param lexer the lexer it reads from
+     * @return the whole module, or null if anything in it failed
+     * @throws IOException if the input cannot be read
+     */
+    private static String generateModule(final Parser parser, final Lexer lexer) throws IOException {
+        final IRBuilder builder = new IRBuilder();
+        final StringBuilder module = new StringBuilder();
+
+        while (true) {
+            final PrintStream diagnostics = System.err;
+            final ByteArrayOutputStream reported = new ByteArrayOutputStream();
+
+            final FunctionAST definition;
+            final boolean endOfInput;
+            System.setErr(new PrintStream(reported, true, StandardCharsets.UTF_8));
+            try {
+                definition = parser.ParseDefinition();
+                endOfInput = definition == null && lexer.GetTok() == Lexer.Tokens.EOF.value;
+            } finally {
+                System.setErr(diagnostics);
+            }
+
+            if (endOfInput) break;
+
+            if (reported.size() > 0) {
+                diagnostics.print(reported.toString(StandardCharsets.UTF_8));
+            }
+
+            if (definition == null) {
+                System.err.println("Syntax error");
+                return null;
+            }
+
+            final Value function = definition.Codegen(builder);
+            if (function == null) {
+                System.err.println("Error building the IR");
+                return null;
+            }
+            module.append(function.text());
+        }
+
+        if (module.isEmpty()) {
+            System.err.println("Syntax error");
+            return null;
+        }
+
+        return module.toString();
     }
 
     /**
@@ -122,7 +169,11 @@ class CompilerCmd implements Callable<Integer> {
                 System.out.println("Optimized IR saved to: " + outputLl);
                 return true;
             } else {
-                System.err.println("Opt tool failed with exit code " + exitCode + ". Proceeding with raw IR.");
+                // The raw IR was not a module, so there is nothing to optimise and
+                // nothing to hand to the linker either. Carrying on from here built a
+                // binary from IR that had already been rejected — or none at all —
+                // and reported success.
+                System.err.println("Opt tool failed with exit code " + exitCode + ".");
                 return false;
             }
         } catch (IOException | InterruptedException e) {
@@ -135,8 +186,9 @@ class CompilerCmd implements Callable<Integer> {
      * Wrapper for calling cLang with a try/catch block
      * @param llFilePath file path for the LLVM file
      * @param outputBinaryName name for the final binary file
+     * @return 0 if the executable was produced, 1 otherwise
      */
-    private static void compileToBinary(String llFilePath, String outputBinaryName) {
+    private static int compileToBinary(String llFilePath, String outputBinaryName) {
         System.out.println("Launching Clang...");
 
         final ProcessBuilder processBuilder = createProcessBuilder(llFilePath, outputBinaryName);
@@ -147,12 +199,15 @@ class CompilerCmd implements Callable<Integer> {
 
             if (exitCode == 0) {
                 System.out.println("Executable created: ./" + outputBinaryName);
+                return 0;
             } else {
                 System.err.println("Error during compilation. Exit code: " + exitCode);
+                return 1;
             }
         } catch (IOException | InterruptedException e) {
             System.err.println("Failed to launch Clang");
             e.printStackTrace();
+            return 1;
         }
     }
 
@@ -187,6 +242,7 @@ class CompilerCmd implements Callable<Integer> {
  */
 public class Main {
     public static void main(String[] args) {
-        new CommandLine(new CompilerCmd()).execute(args);
+        final int exitCode = new CommandLine(new CompilerCmd()).execute(args);
+        System.exit(exitCode);
     }
 }

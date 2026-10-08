@@ -75,6 +75,12 @@ public class Lexer {
     private int LastChar = ' ';
     public String IdentifierStr;
     public double NumVal;
+    /** the number exactly as it was written, which NumVal cannot represent */
+    public String NumberText;
+    /** true when the literal had a decimal point or an exponent */
+    public boolean NumIsFloat;
+    /** true when the literal was written without one */
+    public boolean NumIsInteger;
 
     // stream for the input
     private final InputStream input;
@@ -151,17 +157,36 @@ public class Lexer {
                 return Tokens.IDENTIFIER.value;
         }
 
-            // numbers
+            // Numbers.
+            //
+            // The spelling is kept as well as the value. NumVal is a double, and
+            // a double cannot hold 9007199254740993 — it comes back as
+            // 9007199254740992, one out, with nothing to say so. Carrying the text
+            // lets an integer literal survive to the IR as the number that was
+            // written, which is the only way an int64 literal above 2^53 can be
+            // correct.
             if (Character.isDigit(LastChar) || LastChar == '.') {
                 final StringBuilder NumStr = new StringBuilder();
+                boolean floating = false;
 
                 do {
+                    if (LastChar == '.' || LastChar == 'e' || LastChar == 'E') {
+                        floating = true;
+                    }
                     NumStr.append((char) LastChar);
                     LastChar = input.read();
-                } while (Character.isDigit(LastChar) || LastChar == '.');
+                } while (Character.isDigit(LastChar) || LastChar == '.'
+                        || LastChar == 'e' || LastChar == 'E');
 
-                // parse float numbers
-                NumVal = Double.parseDouble(NumStr.toString());
+                NumberText = NumStr.toString();
+                try {
+                    NumVal = Double.parseDouble(NumberText);
+                } catch (final NumberFormatException e) {
+                    System.err.println("Error: malformed number: " + NumberText);
+                    NumVal = 0;
+                }
+                NumIsFloat = floating;
+                NumIsInteger = !floating;
                 return Tokens.NUMBER.value;
             }
 
