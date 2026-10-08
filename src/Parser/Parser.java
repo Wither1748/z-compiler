@@ -311,6 +311,8 @@ public class Parser {
         final Lexer.Tokens token = Lexer.Tokens.fromValues(curTok);
         if (token == Lexer.Tokens.RET) {
             return ParseRet();
+        } else if (token == Lexer.Tokens.FOR) {
+            return ParseFor();
         } else if (isTypeToken(token)) {
             return ParseVariable();
         } else if (token == Lexer.Tokens.CN) {
@@ -420,6 +422,100 @@ public class Parser {
         functionCount.put(fnName, 0);
 
         return new ExprAST.PrototypeAST(fnName, params);
+    }
+
+    /**
+     * Parses a for loop: for (type name -> init | cond | op) { body }
+     * @return a ForAST node or an error
+     * @throws IOException
+     */
+    public final ExprAST.ForAST ParseFor() throws IOException {
+        Next();  // skip 'for'
+
+        // Expect '('
+        if (curTok != Lexer.Tokens.OPEN_PAR.value) {
+            return ExprAST.LogErrorF("Expected '(' after 'for'");
+        }
+        Next();
+
+        // Parse type
+        final Lexer.Tokens typeTok = Lexer.Tokens.fromValues(curTok);
+        if (typeTok == null || !isTypeToken(typeTok)) {
+            return ExprAST.LogErrorF("Expected type in for");
+        }
+        final String varType = typeTok.description;
+        Next();
+
+        // Parse name
+        if (curTok != Lexer.Tokens.IDENTIFIER.value) {
+            return ExprAST.LogErrorF("Expected variable name in for");
+        }
+        final String varName = lex.IdentifierStr;
+        Next();
+
+        // Parse initial value (required in scheme A)
+        if (curTok != Lexer.Tokens.ASSIGN.value && curTok != Lexer.Tokens.SAME.value) {
+            return ExprAST.LogErrorF("Expected '->' or '=' for initial value in for");
+        }
+        Next();
+        final ExprAST init = ParseExpression();
+        if (init == null) return null;
+
+        // Expect '|'
+        if (curTok != Lexer.Tokens.PARAMS.value) {
+            return ExprAST.LogErrorF("Expected '|' after initial value in for");
+        }
+        Next();
+
+        // Parse condition
+        final ExprAST cond = ParseExpression();
+        if (cond == null) return null;
+
+        // Expect '|'
+        if (curTok != Lexer.Tokens.PARAMS.value) {
+            return ExprAST.LogErrorF("Expected '|' after condition in for");
+        }
+        Next();
+
+        // Parse update
+        final ExprAST update = ParseExpression();
+        if (update == null) return null;
+
+        // Expect ')'
+        if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
+            return ExprAST.LogErrorF("Expected ')' after for header");
+        }
+        Next();
+
+        // Parse body
+        if (curTok != Lexer.Tokens.OPEN_FUNC.value) {
+            return ExprAST.LogErrorF("Expected '{' for for body");
+        }
+        Next();
+
+        final List<ExprAST> bodyStatements = new ArrayList<>();
+        while (curTok != Lexer.Tokens.CLOSE_FUNC.value && curTok != Lexer.Tokens.EOF.value) {
+            if (curTok == ';') {
+                Next();
+                continue;
+            }
+            final ExprAST stmt = ParseStatement();
+            if (stmt != null) {
+                bodyStatements.add(stmt);
+            } else {
+                break;
+            }
+        }
+
+        if (curTok == Lexer.Tokens.CLOSE_FUNC.value) {
+            Next();
+        }
+
+        final ExprAST body = bodyStatements.size() == 1
+                ? bodyStatements.get(0)
+                : new ExprAST.BlockAST(bodyStatements);
+
+        return new ExprAST.ForAST(varType, varName, init, cond, update, body);
     }
 
     /**

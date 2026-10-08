@@ -109,6 +109,33 @@ public class IRBuilder {
         return prefix + "." + (labelCount++);
     }
 
+    /**
+     * emitLabel outputs a label line, e.g. "for.cond:"
+     * @param label the label name (without '%')
+     */
+    public void emitLabel(final String label) {
+        appendLine(label + ":");
+    }
+
+    /**
+     * emitBr outputs an unconditional branch, e.g. "br label %for.cond"
+     * @param label the target label (without '%')
+     */
+    public void emitBr(final String label) {
+        appendLine("br label %" + label);
+    }
+
+    /**
+     * emitCondBr outputs a conditional branch, e.g.
+     * "br i1 %1, label %for.body, label %for.end"
+     * @param condReg the i1 condition register
+     * @param trueLabel label to jump to if true
+     * @param falseLabel label to jump to if false
+     */
+    public void emitCondBr(final String condReg, final String trueLabel, final String falseLabel) {
+        appendLine("br i1 " + condReg + ", label %" + trueLabel + ", label %" + falseLabel);
+    }
+
 
     /**
      * setter method for registerTypes

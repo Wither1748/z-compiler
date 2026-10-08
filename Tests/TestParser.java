@@ -225,4 +225,18 @@ public class TestParser {
         assertEquals("var", v.getName());
         assertInstanceOf(ExprAST.VariableExprAST.class, v);
     }
+
+    @Test
+    void testForLoopParsing() throws IOException {
+        final String code = "proc main() {\n"
+                + "  for (int32 i -> 0 | i < 10 | i + 1) {\n"
+                + "    ret 0\n"
+                + "  }\n"
+                + "}";
+
+        final Parser parser = createParser(code);
+        final ExprAST.FunctionAST fn = parser.ParseDefinition();
+
+        assertNotNull(fn);
+    }
 }

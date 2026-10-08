@@ -67,6 +67,16 @@ public abstract class ExprAST {
     }
 
     /**
+     * Error logging method for for loops
+     * @param err error message
+     * @return null
+     */
+    public static ForAST LogErrorF(final String err) {
+        System.err.printf("Error: %s%n", err);
+        return null;
+    }
+
+    /**
      * Number expression class, gets called in case of a NUMBER token (es. 10)
      */
     public static class NumberExprAST extends ExprAST {
@@ -213,6 +223,9 @@ public abstract class ExprAST {
         private final char op;
         private final ExprAST left;
         private final ExprAST right;
+        public final char getOp() { return op; }
+        public final ExprAST getLeft() { return left; }
+        public final ExprAST getRight() { return right; }
 
         /**
          * Constructor for a binary operation
@@ -465,6 +478,138 @@ public abstract class ExprAST {
                 lastVal = stmt.Codegen(builder);
             }
             return lastVal;
+        }
+    }
+
+    /**
+     * For loop class: for (type name -> init | cond | op) { body }
+     */
+    public static class ForAST extends ExprAST {
+        /**
+         * varType is the type of the loop variable (e.g. "int32")
+         * varName is the name of the loop variable (e.g. "i")
+         * init is the initial value expression
+         * cond is the loop condition expression
+         * update is the update expression
+         * body is the loop body
+         */
+        private final String varType;
+        private final String varName;
+        private final ExprAST init;
+        private final ExprAST cond;
+        private final ExprAST update;
+        private final ExprAST body;
+
+        /**
+         * Constructor for a for loop
+         * @param varType type of the loop variable
+         * @param varName name of the loop variable
+         * @param init initial value expression
+         * @param cond loop condition expression
+         * @param update update expression
+         * @param body loop body
+         */
+        public ForAST(final String varType, final String varName,
+                      final ExprAST init, final ExprAST cond,
+                      final ExprAST update, final ExprAST body) {
+            this.varType = varType;
+            this.varName = varName;
+            this.init = init;
+            this.cond = cond;
+            this.update = update;
+            this.body = body;
+        }
+
+        /**
+         * getter methods for a for loop
+         * @return fields
+         */
+        public final String getVarType() { return varType; }
+        public final String getVarName() { return varName; }
+        public final ExprAST getInit() { return init; }
+        public final ExprAST getCond() { return cond; }
+        public final ExprAST getUpdate() { return update; }
+        public final ExprAST getBody() { return body; }
+
+        @Override
+        public final String Codegen(final IRBuilder builder) {
+            final String llvmType = Types.getLlvmType(varType);
+
+            // 1. Allocate and initialize the loop variable
+            final String varPtr = builder.emitAlloca(varName, llvmType);
+            symbolTable.define(varName, new SymbolTable.SymbolInfo(varName, llvmType, varPtr, false));
+
+            final String initReg = init.Codegen(builder);
+            if (initReg == null) return null;
+            builder.emitStore(initReg, llvmType, varPtr);
+
+            // 2. Create labels
+            final String condLabel = builder.nextLabel("for.cond");
+            final String bodyLabel = builder.nextLabel("for.body");
+            final String incLabel  = builder.nextLabel("for.inc");
+            final String endLabel  = builder.nextLabel("for.end");
+
+            // 3. Jump to condition check
+            builder.emitBr(condLabel);
+            builder.emitLabel(condLabel);
+
+            // 4. Evaluate condition as i1 and branch
+            final String condReg = emitCondI1(builder);
+            if (condReg == null) return null;
+            builder.emitCondBr(condReg, bodyLabel, endLabel);
+
+            // 5. Loop body
+            builder.emitLabel(bodyLabel);
+            body.Codegen(builder);
+            builder.emitBr(incLabel);
+
+            // 6. Increment step
+            builder.emitLabel(incLabel);
+            final String updateVal = update.Codegen(builder);
+            if (updateVal == null) return null;
+            builder.emitStore(updateVal, llvmType, varPtr);
+            builder.emitBr(condLabel);
+
+            // 7. Exit label
+            builder.emitLabel(endLabel);
+
+            // For is a statement, not an expression. Return "0" as a placeholder
+            // so that a function whose last statement is a for loop can still
+            // generate a valid `ret i32 0` for main.
+            return "0";
+        }
+
+        /**
+         * Evaluates the for-loop condition and returns the i1 register.
+         * Handles `<` and `>` directly to avoid the i1 -> i32 zext that
+         * BinaryExprAST emits for comparisons.
+         */
+        private String emitCondI1(final IRBuilder builder) {
+            if (cond instanceof BinaryExprAST) {
+                final BinaryExprAST bin = (BinaryExprAST) cond;
+                final char op = bin.getOp();
+                if (op == '<' || op == '>') {
+                    final String leftVal = bin.getLeft().Codegen(builder);
+                    final String rightVal = bin.getRight().Codegen(builder);
+                    if (leftVal == null || rightVal == null) return null;
+
+                    String leftType = builder.getRegisterType(leftVal);
+                    if (leftType == null) {
+                        leftType = leftVal.contains(".") ? "double" : "i32";
+                    }
+                    final boolean isFloat = leftType.equals("double") || leftType.equals("float");
+                    final String cmpReg = builder.nextRegister();
+                    if (isFloat) {
+                        final String pred = op == '<' ? "olt" : "ogt";
+                        builder.appendLine(cmpReg + " = fcmp " + pred + " " + leftType + " " + leftVal + ", " + rightVal);
+                    } else {
+                        final String pred = op == '<' ? "slt" : "sgt";
+                        builder.appendLine(cmpReg + " = icmp " + pred + " " + leftType + " " + leftVal + ", " + rightVal);
+                    }
+                    return cmpReg;
+                }
+            }
+            return null;
         }
     }
 
