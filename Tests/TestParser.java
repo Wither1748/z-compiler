@@ -2,14 +2,14 @@ package Tests;
 
 import org.junit.jupiter.api.Test;
 import src.AST.ExprAST;
-import src.Parser.Parser;
-import src.Parser.ZType;
+import src.Parser.*;
 import src.Lexer.Lexer;
 import src.AST.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -289,12 +289,15 @@ public class TestParser {
     }
 
     @Test
-    void testStatementAfterAFunctionIsNotReadAsAFunction() {
+    void testIncompleteTopLevelVariableFails() {
         final String diagnostics =
                 ZFixtures.failureOf("proc main() { ret 1 }\nint32 x -> ");
 
         assertNotNull(diagnostics);
-        assertTrue(diagnostics.contains("Expected 'proc'"), diagnostics);
+        // Top-level variables are recognised now, so the failure is the
+        // missing initialiser expression, not a missing `proc`.
+        assertTrue(diagnostics.contains("unknown token when expecting an expression"),
+                diagnostics);
     }
 
     @Test
@@ -524,14 +527,14 @@ public class TestParser {
     @Test
     void testPointerType() throws IOException {
         final Parser parser = createParser("int32*");
-        final ZType type = parser.parseType(false);
+        final TypeRef type = parser.parseType(false);
         assertEquals(ZType.INT32_PTR, type);
     }
 
     @Test
     void testDoublePointerType() throws IOException {
         final Parser parser = createParser("int32**");
-        final ZType type = parser.parseType(false);
+        final TypeRef type = parser.parseType(false);
         assertEquals(ZType.PTR, type);  // double pointer maps to void*
     }
 
@@ -564,5 +567,77 @@ public class TestParser {
         assertEquals("str", proto.params().get(0).type());
         assertEquals("int32", proto.params().get(1).type());
         assertEquals(ZType.VARARG.zName(), proto.params().get(2).type());
+    }
+
+    @Test
+    void testStructDeclarationIsParsed() throws IOException {
+        StructRegistry.clear();
+        final Parser parser = createParser("struct Point { int32 x | int32 y }");
+        assertInstanceOf(StructDeclAST.class, parser.parseStructDecl());
+    }
+
+    @Test
+    void testStructDeclarationMissingNameFails() throws IOException {
+        final Parser parser = createParser("struct { int32 x }");
+        assertNull(parser.parseStructDecl());
+    }
+
+    @Test
+    void testStructDeclarationMissingBraceFails() throws IOException {
+        final Parser parser = createParser("struct Point int32 x }");
+        assertNull(parser.parseStructDecl());
+    }
+
+    @Test
+    void testStructDeclarationMissingFieldTypeFails() throws IOException {
+        final Parser parser = createParser("struct Point { x }");
+        assertNull(parser.parseStructDecl());
+    }
+
+    @Test
+    void testStructDeclarationMissingFieldNameFails() throws IOException {
+        final Parser parser = createParser("struct Point { int32 }");
+        assertNull(parser.parseStructDecl());
+    }
+
+    @Test
+    void testStructDeclarationMissingCloseFails() throws IOException {
+        final Parser parser = createParser("struct Point { int32 x");
+        assertNull(parser.parseStructDecl());
+    }
+
+    @Test
+    void testDuplicateStructDeclarationFails() throws IOException {
+        StructRegistry.clear();
+        final Parser parser = createParser(
+                "struct Point { int32 x }\nstruct Point { int32 y }");
+        assertNotNull(parser.parseStructDecl());
+        assertNull(parser.parseStructDecl());
+    }
+
+    @Test
+    void testStructTypeInParseType() throws IOException {
+        StructRegistry.clear();
+        final Parser parser = createParser("Point");
+        // Register the struct first so parseType can resolve the name.
+        StructRegistry.register(new StructType("Point", List.of()));
+        final TypeRef t = parser.parseType(false);
+        assertInstanceOf(StructType.class, t);
+    }
+
+    @Test
+    void testStructPointerTypeInParseType() throws IOException {
+        StructRegistry.clear();
+        StructRegistry.register(new StructType("Point", List.of()));
+        final Parser parser = createParser("Point*");
+        final TypeRef t = parser.parseType(false);
+        assertSame(ZType.PTR, t);
+    }
+
+    @Test
+    void testUnknownTokenInError() throws IOException {
+        // `@` is not a known token; describeToken falls back to its raw value.
+        final Parser parser = createParser("proc main() { @ }");
+        assertNull(parser.parseDefinition());
     }
 }

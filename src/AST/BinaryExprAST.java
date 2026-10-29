@@ -3,6 +3,7 @@ package src.AST;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 
@@ -41,11 +42,16 @@ public final class BinaryExprAST extends ExprAST {
         };
     }
 
-    private ZType operandType(final IRBuilder builder) {
-        final ZType a = left.type(builder);
-        final ZType b = right.type(builder);
+    private TypeRef operandType(final IRBuilder builder) {
+        final TypeRef a = left.type(builder);
+        final TypeRef b = right.type(builder);
+        if (a.isStruct() || b.isStruct()) {
+            logger.error("Error: struct cannot be used in a binary expression");
+            builder.markFailed();
+            return ZType.INT32;
+        }
         try {
-            return ZType.unify(a, b);
+            return ZType.unify((ZType) a, (ZType) b);
         } catch (final IllegalArgumentException e) {
             logger.error("Error: {}", e.getMessage());
             return a;
@@ -53,7 +59,7 @@ public final class BinaryExprAST extends ExprAST {
     }
 
     @Override
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         return operandType(builder);
     }
 
@@ -70,7 +76,7 @@ public final class BinaryExprAST extends ExprAST {
             return null;
         }
 
-        final ZType common = operandType(builder);
+        final TypeRef common = operandType(builder);
         final Value a = left.coerce(builder, lhs, common);
         final Value b = right.coerce(builder, rhs, common);
         if (a == null || b == null) return null;
@@ -103,7 +109,7 @@ public final class BinaryExprAST extends ExprAST {
         return new Value(result, a.type());
     }
 
-    String predicate(final boolean ordered, final ZType type) {
+    String predicate(final boolean ordered, final TypeRef type) {
         if (ordered) {
             return switch (op) {
                 case "<" -> "olt";
@@ -127,8 +133,11 @@ public final class BinaryExprAST extends ExprAST {
         };
     }
 
-    private String arithmeticOpcode(final ZType type) {
-        if (type.isFloat()) {
+    private String arithmeticOpcode(final TypeRef type) {
+        if (!(type instanceof ZType zt)) {
+            return null;
+        }
+        if (zt.isFloat()) {
             return switch (op) {
                 case "+" -> "fadd";
                 case "-" -> "fsub";
@@ -138,7 +147,7 @@ public final class BinaryExprAST extends ExprAST {
                 default -> null;
             };
         }
-        final boolean unsigned = type.isUnsigned();
+        final boolean unsigned = zt.isUnsigned() || zt.isBoolean();
         return switch (op) {
             case "+" -> "add";
             case "-" -> "sub";

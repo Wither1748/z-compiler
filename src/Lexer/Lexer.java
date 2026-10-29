@@ -19,6 +19,7 @@ public class Lexer {
      * Enum of Tokens
      */
     public enum Tokens {
+        STRUCT("struct", -52),
         VARARG("...", -51),
         EXTERN("extern", -50),
         FUNC("proc", -1),

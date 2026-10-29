@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
 import src.Codegen.SymbolTable;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 public final class VarRefExprAST extends ExprAST {
@@ -21,10 +22,10 @@ public final class VarRefExprAST extends ExprAST {
     }
 
     @Override
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         SymbolTable.SymbolInfo info = builder.symbols().lookup(name);
         if (info == null && !name.contains(".")) info = builder.symbols().lookup(builder.qualify(name));
-        return info == null ? ZType.INT32 : info.getZType();
+        return info == null ? ZType.INT32 : info.getType();
     }
 
     @Override
@@ -38,7 +39,7 @@ public final class VarRefExprAST extends ExprAST {
             builder.markFailed();
             return null;
         }
-        final ZType type = info.getZType();
+        final TypeRef type = info.getType();
         return new Value(builder.emitLoad(type.llvm(), info.getPointerReg()), type);
     }
 }

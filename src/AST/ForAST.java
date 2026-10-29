@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
 import src.Codegen.Loop;
 import src.Codegen.SymbolTable;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 /**
@@ -17,14 +18,14 @@ import src.Parser.ZType;
 public final class ForAST extends ExprAST {
     private static final Logger logger = LoggerFactory.getLogger(ForAST.class);
 
-    private final ZType varType;
+    private final TypeRef varType;
     private final String varName;
     private final ExprAST init;
     private final ExprAST cond;
     private final ExprAST update;
     private final ExprAST body;
 
-    public ForAST(final ZType varType, final String varName, final ExprAST init, final ExprAST cond, final ExprAST update, final ExprAST body) {
+    public ForAST(final TypeRef varType, final String varName, final ExprAST init, final ExprAST cond, final ExprAST update, final ExprAST body) {
         this.varType = varType;
         this.varName = varName;
         this.init = init;
@@ -34,7 +35,7 @@ public final class ForAST extends ExprAST {
     }
 
     /** @return the declared type of the loop variable */
-    public ZType varType() { return varType; }
+    public TypeRef varType() { return varType; }
 
     /** @return the loop variable name */
     public String varName() { return varName; }
@@ -52,7 +53,7 @@ public final class ForAST extends ExprAST {
     public ExprAST body() { return body; }
 
     @Override
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         return ZType.VOID;
     }
 

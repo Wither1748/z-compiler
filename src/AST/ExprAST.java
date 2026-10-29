@@ -2,6 +2,7 @@ package src.AST;
 
 import src.Codegen.IRBuilder;
 import src.Parser.ZType;
+import src.Parser.TypeRef;
 
 public abstract class ExprAST {
 
@@ -9,7 +10,7 @@ public abstract class ExprAST {
      * What this node produces.
      *
      */
-    public abstract ZType type(IRBuilder builder);
+    public abstract TypeRef type(IRBuilder builder);
 
     /**
      * Emits the code for this node.
@@ -35,9 +36,9 @@ public abstract class ExprAST {
      *
      * @return the value in the requested type, or the original when it already is
      */
-    public Value coerce(final IRBuilder builder, final Value value, final ZType target) {
+    public Value coerce(final IRBuilder builder, final Value value, final TypeRef target) {
         if (value == null || target == null) return value;
-        final ZType from = value.type();
+        final TypeRef from = value.type();
         if (from == target) return value;
 
         if (from.isString() || target.isString()) {

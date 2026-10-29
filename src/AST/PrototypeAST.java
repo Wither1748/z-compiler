@@ -1,5 +1,6 @@
 package src.AST;
 
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 import java.util.List;
@@ -15,7 +16,7 @@ import java.util.List;
  * their return type in the builder instead, because externs have no
  * source-level return type in the prototype syntax.
  */
-public record PrototypeAST(String name, List<Param> params, ZType returnType) {
+public record PrototypeAST(String name, List<Param> params, TypeRef returnType) {
 
     public PrototypeAST {
         params = List.copyOf(params);

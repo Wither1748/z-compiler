@@ -1046,4 +1046,273 @@ public class TestCodeGen {
         assertNotNull(ir, "compilation failed");
         assertTrue(ir.contains("ret i32 281"), ir);
     }
+
+    @Test
+    public void testStructDeclarationAndFieldAccess() throws IOException {
+        final String code = """
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    ret p.x
+                }""";
+
+        final String llvmIR = codeGen(code);
+
+        assertNotNull(llvmIR, "compilation failed");
+        assertTrue(llvmIR.contains("%Point = type { i32, i32 }"), llvmIR);
+        assertTrue(llvmIR.contains("insertvalue %Point undef, i32 1, 0"), llvmIR);
+        assertTrue(llvmIR.contains("insertvalue %Point"), llvmIR);
+        assertTrue(llvmIR.contains("getelementptr inbounds %Point"), llvmIR);
+    }
+
+    @Test
+    public void testStructFieldAccessFailsOnUnknownField() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    ret p.z
+                }""");
+
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("has no field 'z'"), diagnostics);
+    }
+
+    @Test
+    public void testFieldAccessOnNonStructFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                proc main() {
+                    int32 x -> 1
+                    ret x.field
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("is not a struct"), diagnostics);
+    }
+
+    @Test
+    public void testFieldAccessOnUndeclaredVariableFails() {
+        final String diagnostics = ZFixtures.failureOf(
+                "proc main() { ret ghost.x }");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("undeclared variable"), diagnostics);
+    }
+
+    @org.junit.jupiter.api.Disabled("Needs postfix .field on (expr) — follow-up PR")
+    @Test
+    public void testFieldAccessNeedsVariableBase() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x }
+                proc main() {
+                    ret (Point{1}).x
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("field access needs a variable base"), diagnostics);
+    }
+
+    @Test
+    public void testFieldAccessOnNestedStruct() throws IOException {
+        final String llvmIR = codeGen("""
+                struct Inner { int32 v }
+                struct Outer { Inner inner | int32 y }
+                proc main() {
+                    Outer o -> Outer{Inner{7} | 2}
+                    ret o.inner.v
+                }""");
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("getelementptr inbounds %Outer"), llvmIR);
+        assertTrue(llvmIR.contains("getelementptr inbounds %Inner"), llvmIR);
+    }
+
+    @Test
+    public void testStructLiteralUnknownTypeFails() {
+        final String diagnostics = ZFixtures.failureOf(
+                "proc main() { ret Unknown{1} }");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("Unknown struct"), diagnostics);
+    }
+
+    @Test
+    public void testStructLiteralWrongArityFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc main() { ret Point{1} }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("expects 2 values"), diagnostics);
+    }
+
+    @Test
+    public void testStructLiteralCoerceFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { str name | int32 y }
+                proc main() { Point p -> Point{1 | 2}\n ret p.y }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("cannot convert between str"), diagnostics);
+    }
+
+    @Test
+    public void testStructDeclOnlyModule() throws IOException {
+        final String llvmIR = codeGen("struct Point { int32 x | int32 y }");
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("%Point = type { i32, i32 }"), llvmIR);
+    }
+
+    @Test
+    public void testStructAsGlobalVariable() throws IOException {
+        final String llvmIR = codeGen("""
+                struct Point { int32 x | int32 y }
+                Point origin -> Point{0 | 0}
+                proc main() { ret 0 }""");
+        assertNotNull(llvmIR, "compilation failed");
+        assertTrue(llvmIR.contains("@origin = global %Point { i32 0, i32 0 }"), llvmIR);
+    }
+
+    @Test
+    public void testStructAsParameterAndReturn() throws IOException {
+        final String llvmIR = codeGen("""
+                struct Point { int32 x | int32 y }
+                proc id(Point p) -> Point { ret p }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    Point q -> id(p)
+                    ret q.x
+                }""");
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("@id(%Point %p)"), llvmIR);
+        assertTrue(llvmIR.contains("call %Point @id(%Point"), llvmIR);
+    }
+
+    @Test
+    public void testFunctionReturningStructFallsOffFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc f() -> Point { }""");
+        assertNotNull(diagnostics);
+        // No `ret`: FunctionAST reports that the function can reach the end
+        // without returning.
+        assertTrue(diagnostics.contains("without returning"), diagnostics);
+    }
+
+    @Test
+    public void testStructInComparisonFails() {
+        final String diagnostics =  ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    if (p < p) { ret 1 }
+                    ret 0
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("struct cannot be used in a comparison"), diagnostics);
+    }
+
+    @Test
+    public void testStructInArithmeticFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    ret p + p
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("struct cannot be used in a binary expression"), diagnostics);
+    }
+
+    @Test
+    public void testStructComparedWithIntFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    ret p < 5
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("struct cannot be used in a binary expression"), diagnostics);
+    }
+
+    @Test
+    public void testStructUnaryMinusFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    ret -p
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("cannot"), diagnostics);
+    }
+
+    @org.junit.jupiter.api.Disabled("Needs postfix .field on (expr) — follow-up PR")
+    @Test
+    public void testStructPointerFieldAccess() throws IOException {
+        final String llvmIR = codeGen("""
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    Point* pp -> &p
+                    ret (*pp).x
+                }""");
+        assertNotNull(llvmIR);
+        assertTrue(llvmIR.contains("getelementptr inbounds %Point"), llvmIR);
+    }
+
+    @Test
+    public void testStructLiteralWithUndeclaredFieldValueFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc main() {
+                    Point p -> Point{ghost | 2}
+                    ret 0
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("undeclared variable"), diagnostics);
+    }
+
+    @Test
+    public void testStructLiteralWithWrongFieldTypeFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { str name | int32 y }
+                proc main() {
+                    Point p -> Point{1 | 2}
+                    ret 0
+                }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("cannot convert between str"), diagnostics);
+    }
+
+    @Test
+    public void testStructGlobalWithWrongArityFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                Point origin -> Point{0}
+                proc main() { ret 0 }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("constant expression"), diagnostics);
+    }
+
+    @Test
+    public void testStructGlobalWithNonConstantFieldFails() {
+        final String diagnostics = ZFixtures.failureOf("""
+                struct Point { int32 x | int32 y }
+                proc f() -> int32 { ret 5 }
+                Point origin -> Point{f() | 0}
+                proc main() { ret 0 }""");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("constant expression"), diagnostics);
+    }
+
+    @Test
+    public void testVariableMissingNameFails() {
+        final String diagnostics = ZFixtures.failureOf(
+                "proc main() { int32\n ret 0 }");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("Expected name after type"), diagnostics);
+    }
+
+    @Test
+    void testCallArgCodeGenFails() {
+        final String diagnostics = ZFixtures.failureOf(
+                "proc foo(int32 x) { ret x }\nproc main() { foo(ghost) }");
+        assertNotNull(diagnostics);
+        assertTrue(diagnostics.contains("undeclared variable"), diagnostics);
+    }
 }

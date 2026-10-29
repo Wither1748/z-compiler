@@ -1,5 +1,6 @@
 package src.Codegen;
 
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 import java.util.*;
@@ -28,7 +29,7 @@ public class SymbolTable {
          * callCount is the number of times the var is called
          */
         private final String name;
-        private final ZType type;
+        private final TypeRef type;
         private final String pointerReg;
         private final boolean isConstant;
         private boolean isUsed;
@@ -41,7 +42,7 @@ public class SymbolTable {
          * @param pointerReg the register in which the pointer is stored
          * @param isConstant is it a constant?
          */
-        public SymbolInfo(final String name, final ZType type, final String pointerReg, final boolean isConstant) {
+        public SymbolInfo(final String name, final TypeRef type, final String pointerReg, final boolean isConstant) {
             this.name = name;
             this.type = type;
             this.pointerReg = pointerReg;
@@ -55,7 +56,7 @@ public class SymbolTable {
          * @return name, type, ptrReg, isConstant, isUsed, callCount
          */
         public final String getName() { return name; }
-        public final ZType getZType() { return type; }
+        public final TypeRef getType() { return type; }
         public final String getLlvmType() { return type.llvm(); }
         public final String getPointerReg() { return pointerReg; }
         public final boolean isConstant() { return isConstant; }
