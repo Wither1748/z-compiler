@@ -1,6 +1,7 @@
 package src.AST;
 
 import src.Codegen.IRBuilder;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 
@@ -54,7 +55,7 @@ public final class NumberExprAST extends ExprAST {
     }
 
     @Override
-    public Value coerce(final IRBuilder builder, final Value value, final ZType target) {
+    public Value coerce(final IRBuilder builder, final Value value, final TypeRef target) {
         if (target != null && target != type(null)) {
             if (floating) return new Value(target.literal(real), target);
             if (target.isIntegral()) return new Value(target.literal(integer), target);

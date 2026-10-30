@@ -1,5 +1,6 @@
 package src.AST;
 
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 import src.Codegen.IRBuilder;
 import src.Parser.ZType;
@@ -15,7 +16,7 @@ public class ArrayIdxExprAST extends ExprAST {
         this.indexes = indexes;
         return;
     }
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         return arrExpr.type(builder);
     } //will return a pointer as a type
     public Value codeGen(final IRBuilder builder) {

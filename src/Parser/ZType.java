@@ -15,7 +15,7 @@ package src.Parser;
  * yet, so the only thing a {@code str} can do for now is be declared and
  * passed around; it starts life as a null pointer.
  */
-public enum ZType {
+public enum ZType implements TypeRef {
     VARARG    ("...", "...", "null", 64, Kind.VARARG),
     PTR       ("ptr",     "ptr", "null", 64, Kind.POINTER),
     INT32_PTR ("int32*",  "ptr", "null", 64, Kind.POINTER),
@@ -232,4 +232,10 @@ public enum ZType {
             default -> null;
         };
     }
+
+    @Override
+    public boolean isStruct() { return false; }
+
+    @Override
+    public boolean isVararg() { return kind == Kind.VARARG; }
 }

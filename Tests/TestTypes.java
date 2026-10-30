@@ -185,4 +185,17 @@ public class TestTypes {
         assertThrows(IllegalStateException.class, () -> ZType.STRING.literal(1L));
         assertThrows(IllegalStateException.class, () -> ZType.STRING.literal(1.0));
     }
+
+    @Test
+    public void testZTypeIsStructAndIsVararg() {
+        assertFalse(ZType.INT32.isStruct());
+        assertFalse(ZType.INT32.isVararg());
+        assertTrue(ZType.VARARG.isVararg());
+    }
+
+    @Test
+    public void testZTypePointerToReturnsZType() {
+        assertSame(ZType.INT32_PTR, ZType.INT32.pointerTo());
+        assertSame(ZType.PTR, ZType.VOID.pointerTo());
+    }
 }

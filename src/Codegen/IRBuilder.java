@@ -4,6 +4,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.AST.PrototypeAST;
 import src.AST.Value;
+import src.Parser.StructType;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 import java.util.ArrayDeque;
@@ -102,7 +104,7 @@ public class IRBuilder {
     private static final String DOUBLE = "double";
     private static final String FLT = "float";
     private boolean terminated;
-    private ZType returnType = ZType.FLT64;
+    private TypeRef returnType = ZType.FLT64;
 
     /**.
      */
@@ -182,7 +184,7 @@ public class IRBuilder {
     }
 
     public void emitReturn(final Value value) {
-        final ZType targetType = returnType;
+        final TypeRef targetType = returnType;
         if (returnType == ZType.VOID) {
             appendLine("ret void");
             terminated = true;
@@ -236,7 +238,7 @@ public class IRBuilder {
         terminated = true;
     }
 
-    private static String conversionOpcode(final ZType fromType, final ZType targetType) {
+    private static String conversionOpcode(final TypeRef fromType, final TypeRef targetType) {
         final String from = fromType.llvm();
         final String to = targetType.llvm();
         final boolean fromFloat = fromType.isFloat();
@@ -268,7 +270,7 @@ public class IRBuilder {
     }
 
     /** Declares what the function being generated returns. */
-    public void setReturnType(final ZType type) {
+    public void setReturnType(final TypeRef type) {
         this.returnType = type;
     }
 
@@ -498,5 +500,28 @@ public class IRBuilder {
         if (prototype == null || externReturnTypes.get(name) != returnType) return false;
         return prototype.params().size() == 1
                 && prototype.params().getFirst().type().equals(ZType.STRING.zName());
+    }
+
+    /** The structs this module has already declared. */
+    private final Set<String> declaredStructs = new HashSet<>();
+
+    /** Emits {@code %Point = type { i32, i32 }} once. */
+    public void declareStruct(final StructType type) {
+        if (!declaredStructs.add(type.zName())) return;
+        final StringBuilder sb = new StringBuilder("%").append(type.zName()).append(" = type { ");
+        for (int i = 0; i < type.fields().size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(type.fields().get(i).type().llvm());
+        }
+        sb.append(" }\n");
+        appendToGlobals(sb.toString());
+    }
+
+    /** Emits {@code %r = getelementptr inbounds %T, ptr %base, i32 0, i32 idx}. */
+    public String emitGEP(final String basePtr, final String structType, final int idx) {
+        final String reg = nextRegister();
+        appendLine(reg + " = getelementptr inbounds " + structType
+                + ", ptr " + basePtr + ", i32 0, i32 " + idx);
+        return reg;
     }
 }

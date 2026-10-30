@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
 import src.Codegen.SymbolTable;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 /**
@@ -13,13 +14,13 @@ import src.Parser.ZType;
 public final class DeclaratorExprAST extends ExprAST {
     private static final Logger logger = LoggerFactory.getLogger(DeclaratorExprAST.class);
 
-    private final ZType type;
+    private final TypeRef type;
     private final String name;
     private final ExprAST initialiser;
     private final boolean constant;
     private final boolean global;
 
-    public DeclaratorExprAST(final ZType type, final String name, final ExprAST initialiser, final boolean constant, boolean globals) {
+    public DeclaratorExprAST(final TypeRef type, final String name, final ExprAST initialiser, final boolean constant, boolean globals) {
         this.type = type;
         this.name = name;
         this.initialiser = initialiser;
@@ -28,7 +29,7 @@ public final class DeclaratorExprAST extends ExprAST {
     }
 
     /** @return the declared type */
-    public ZType declaredType() {
+    public TypeRef declaredType() {
         return type;
     }
 
@@ -38,7 +39,7 @@ public final class DeclaratorExprAST extends ExprAST {
     }
 
     @Override
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         return type;
     }
 

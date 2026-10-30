@@ -3,6 +3,9 @@ package src.AST;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
+import src.Parser.StructRegistry;
+import src.Parser.StructType;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 import java.util.List;
@@ -33,7 +36,7 @@ public final class CallExprAST extends ExprAST {
     }
 
     @Override
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         final IRBuilder.ResolvedSignature resolved = builder.resolve(callee);
         if (resolved == null) return ZType.FLT64;
         if (resolved.externReturnType() != null) return resolved.externReturnType();
@@ -71,14 +74,20 @@ public final class CallExprAST extends ExprAST {
                 builder.markFailed();
                 return null;
             }
-            final ZType expected;
+            final TypeRef expected;
             if (i < fixedParams) {
-                expected = ZType.fromZName(params.get(i).type());
+                expected = resolveParamType(params.get(i).type());
             } else {
-                expected = switch (argument.type()) {
+                final TypeRef argType = argument.type();
+                if (!(argType instanceof ZType zt)) {
+                    logger.error("Error: struct argument to a variadic function");
+                    builder.markFailed();
+                    return null;
+                }
+                expected = switch (zt) {
                     case FLT32 -> ZType.FLT64;
                     case BOOL -> ZType.INT32;
-                    default -> argument.type();
+                    default -> zt;
                 };
             }
             final Value fitted = coerce(builder, argument, expected);
@@ -87,7 +96,7 @@ public final class CallExprAST extends ExprAST {
         }
 
         final ZType externReturn = resolved.externReturnType();
-        final ZType result;
+        final TypeRef result;
         if (externReturn != null) {
             result = externReturn;
         } else if (signature.returnType() != null) {
@@ -116,5 +125,21 @@ public final class CallExprAST extends ExprAST {
         builder.appendLine(register + " = " + call);
         builder.setRegisterType(register, result.llvm());
         return new Value(register, result);
+    }
+
+    /**
+     * Resolves a parameter type from the prototype.
+     *
+     * @param name a type name as written in the prototype
+     * @return the built-in type or the struct it names
+     */
+    private static TypeRef resolveParamType(final String name) {
+        try {
+            return ZType.fromZName(name);
+        } catch (final IllegalArgumentException e) {
+            final StructType st = StructRegistry.lookup(name);
+            if (st == null) throw e;
+            return st;
+        }
     }
 }

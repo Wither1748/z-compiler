@@ -12,6 +12,8 @@ import src.Codegen.IRBuilder;
 import src.Parser.Parser;
 import src.Lexer.Lexer;
 import src.AST.DeclaratorExprAST;
+import src.Parser.StructRegistry;
+import src.Parser.StructType;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -296,6 +298,8 @@ public class Main {
      * @throws IOException if an exception is found
      */
     public static String generateModule(final Parser parser, final Path sourceFile) throws IOException {
+        StructRegistry.clear();
+
         // prepares classes
         final IRBuilder builder = new IRBuilder();
         final StringBuilder module = new StringBuilder();
@@ -311,6 +315,10 @@ public class Main {
         final Path fromDir = sourceFile.toAbsolutePath().getParent();
         final List<ModuleAST> dependencies = new ModuleLoader(rootName).loadAll(root.imports(), fromDir);
         if (dependencies == null) return null;
+
+        for (final StructType st : StructRegistry.all()) {
+            builder.declareStruct(st);
+        }
 
         for (final ModuleAST dependency : dependencies) {
             if (!emitModule(dependency, builder, module)) return null;

@@ -1,6 +1,7 @@
 package src.AST;
 
 import src.Codegen.IRBuilder;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 public final class UnaryExprAST extends ExprAST {
@@ -17,7 +18,7 @@ public final class UnaryExprAST extends ExprAST {
     }
 
     @Override
-    public ZType type(final IRBuilder b) {
+    public TypeRef type(final IRBuilder b) {
         return operand.type(b);
     }
 
@@ -39,7 +40,7 @@ public final class UnaryExprAST extends ExprAST {
     public Value constantValue(final IRBuilder b) {
         final Value value = operand.constantValue(b);
         if (value == null) return null;
-        final ZType type = value.type();
+        final TypeRef type = value.type();
         if (type.isFloat()) {
             return new Value(type.literal(-Double.parseDouble(value.text())), type);
         }

@@ -4,6 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
 import src.Codegen.SymbolTable;
+import src.Parser.StructRegistry;
+import src.Parser.StructType;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 import java.util.List;
@@ -25,7 +28,7 @@ public final class FunctionAST extends ExprAST {
     }
 
     /** @return the declared return type, or the historical default */
-    public ZType returnType() {
+    public TypeRef returnType() {
         if (proto.returnType() != null) {
             return proto.returnType();
         }
@@ -51,12 +54,12 @@ public final class FunctionAST extends ExprAST {
         for (int i = 0; i < params.size(); i++) {
             if (i > 0) parameters.append(", ");
             final PrototypeAST.Param param = params.get(i);
-            parameters.append(ZType.fromZName(param.type()).llvm()).append(" %").append(param.name());
+            parameters.append(resolveParamType(param.type()).llvm()).append(" %").append(param.name());
         }
 
         boolean parametersAreDistinct = true;
         for (final PrototypeAST.Param param : params) {
-            final ZType type = ZType.fromZName(param.type());
+            final TypeRef type = resolveParamType(param.type());
             final String slot = builder.emitAlloca(param.name() + ".addr", type.llvm());
             builder.emitStore("%" + param.name(), type.llvm(), slot);
             parametersAreDistinct &= builder.symbols().define(param.name(), new SymbolTable.SymbolInfo(param.name(), type, slot, false));
@@ -82,7 +85,7 @@ public final class FunctionAST extends ExprAST {
                 builder.symbols().exitScope();
                 return null;
             }
-            final ZType ret = returnType();
+            final TypeRef ret = returnType();
             final String zero;
             if (ret.isBoolean()) {
                 zero = "i1 false";
@@ -109,5 +112,15 @@ public final class FunctionAST extends ExprAST {
 
         builder.symbols().exitScope();
         return new Value(text, ZType.VOID);
+    }
+
+    private static TypeRef resolveParamType(final String name) {
+        try {
+            return ZType.fromZName(name);
+        } catch (final IllegalArgumentException e) {
+            final StructType st = StructRegistry.lookup(name);
+            if (st == null) throw e;
+            return st;
+        }
     }
 }

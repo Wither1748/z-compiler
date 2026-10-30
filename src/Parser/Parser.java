@@ -107,16 +107,22 @@ public final class Parser {
      * @return the type, or null when the current token is not a type
      * @throws IOException if an exception is found
      */
-    public ZType parseType(final boolean varargs) throws IOException {
+    public TypeRef parseType(final boolean varargs) throws IOException {
         final Lexer.Tokens typeTok = Lexer.Tokens.fromValues(curTok);
         if (typeTok == Lexer.Tokens.VARARG) {
             if (!varargs) return null;
             next();
             return ZType.VARARG;
         }
-        if (!isTypeToken(typeTok)) return null;
 
-        ZType type = resolveType(typeTok.description);
+        // Built-in type or user-declared struct?
+        TypeRef type = null;
+        if (isTypeToken(typeTok)) {
+            type = resolveType(typeTok.description);
+        } else if (typeTok == Lexer.Tokens.IDENTIFIER
+                && StructRegistry.isStruct(lex.getIdentifierStr())) {
+            type = StructRegistry.lookup(lex.getIdentifierStr());
+        }
         if (type == null) return null;
         next();
 
@@ -158,7 +164,9 @@ public final class Parser {
      * @return whether the parser is positioned on a type keyword
      */
     public boolean atTypeDeclaration() {
-        return isTypeToken(Lexer.Tokens.fromValues(curTok));
+        return isTypeToken(Lexer.Tokens.fromValues(curTok))
+                || (curTok == Lexer.Tokens.IDENTIFIER.value
+                && StructRegistry.isStruct(lex.getIdentifierStr()));
     }
 
 
@@ -210,7 +218,7 @@ public final class Parser {
      * @throws IOException if an exception is found
      */
     public DeclaratorExprAST parseVariable(boolean globals) throws IOException {
-        final ZType zType = parseType(false);
+        final TypeRef zType = parseType(false);
         if (zType == null) return null;
 
         if (curTok != Lexer.Tokens.IDENTIFIER.value) {
@@ -237,7 +245,7 @@ public final class Parser {
     public DeclaratorExprAST parseConstant() throws IOException {
         next();
 
-        final ZType zType = parseType(false);
+        final TypeRef zType = parseType(false);
         if (zType == null) {
             return error("Expected type after 'cn'");
         }
@@ -258,6 +266,60 @@ public final class Parser {
 
         return new DeclaratorExprAST(zType, name, value, true, false);
     }
+
+    /**
+     * Parses a struct declaration:
+     * {@code struct Point { int32 x | int32 y }}.
+     *
+     * @return a StructDeclAST node or an error
+     * @throws IOException if an exception is found
+     */
+    public StructDeclAST parseStructDecl() throws IOException {
+        next();  // consume 'struct'
+
+        if (curTok != Lexer.Tokens.IDENTIFIER.value) {
+            return error("Expected struct name after 'struct'");
+        }
+        final String name = lex.getIdentifierStr();
+        next();
+
+        if (curTok != Lexer.Tokens.OPEN_FUNC.value) {
+            return error("Expected '{' after struct name");
+        }
+        next();
+
+        final List<StructType.Field> fields = new ArrayList<>();
+        while (curTok != Lexer.Tokens.CLOSE_FUNC.value && curTok != Lexer.Tokens.EOF.value) {
+            final TypeRef fieldType = parseType(false);
+            if (fieldType == null) {
+                return error("Expected field type in struct '" + name + "'");
+            }
+            if (curTok != Lexer.Tokens.IDENTIFIER.value) {
+                return error("Expected field name in struct '" + name + "'");
+            }
+            final String fieldName = lex.getIdentifierStr();
+            next();
+            fields.add(new StructType.Field(fieldName, fieldType));
+            if (curTok == Lexer.Tokens.PARAMS.value) {
+                next();
+                continue;
+            }
+            break;
+        }
+
+        if (curTok != Lexer.Tokens.CLOSE_FUNC.value) {
+            return error("Expected '}' at the end of struct '" + name + "'");
+        }
+        next();
+
+        if (StructRegistry.isStruct(name)) {
+            return error("Struct '" + name + "' is already declared");
+        }
+        final StructType st = new StructType(name, fields);
+        StructRegistry.register(st);
+        return new StructDeclAST(st);
+    }
+
     public ArrayAST parseArray() throws IOException {
         //next(); (I believe this isn't necessary here)
         //Array declaration does NOT support expressions inside of it yet. you can only declare with a number
@@ -442,39 +504,76 @@ public final class Parser {
      * @throws IOException if an exception is found
      */
     public ExprAST parseIdentifierExpr() throws IOException {
-        StringBuilder idName = new StringBuilder(lex.getIdentifierStr());
+        final List<String> parts = new ArrayList<>();
+        final StringBuilder fullName = new StringBuilder(lex.getIdentifierStr());
+        parts.add(lex.getIdentifierStr());
         next();
 
         while (curTok == '.') {
             next();
             if (curTok != Lexer.Tokens.IDENTIFIER.value) {
-                return error("Expected a name after '.' in '" + idName + "'");
+                return error("Expected a name after '.' in '" + fullName + "'");
             }
-            idName.append(".").append(lex.getIdentifierStr());
+            fullName.append(".").append(lex.getIdentifierStr());
+            parts.add(lex.getIdentifierStr());
             next();
         }
 
-        if (curTok != Lexer.Tokens.OPEN_PAR.value) {
-            return new VarRefExprAST(idName.toString());
-        }
-        next();
-        final List<ExprAST> args = new ArrayList<>();
-        if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
-            while (true) {
-                final ExprAST arg = parseExpression();
-                if (arg == null) return null;
-                args.add(arg);
-
-                if (curTok == Lexer.Tokens.CLOSE_PAR.value) break;
-
-                if (curTok != Lexer.Tokens.PARAMS.value) {
-                    return error("Expected ')' or '|' in argument list in: " + idName);
+        // struct literal: Point{1 | 2}
+        if (curTok == Lexer.Tokens.OPEN_FUNC.value) {
+            if (parts.size() == 1 && StructRegistry.isStruct(parts.getFirst())) {
+                next();
+                final List<ExprAST> values = new ArrayList<>();
+                if (curTok != Lexer.Tokens.CLOSE_FUNC.value) {
+                    while (true) {
+                        final ExprAST val = parseExpression();
+                        if (val == null) return null;
+                        values.add(val);
+                        if (curTok == Lexer.Tokens.CLOSE_FUNC.value) break;
+                        if (curTok != Lexer.Tokens.PARAMS.value) {
+                            return error("Expected '|' or '}' in struct literal");
+                        }
+                        next();
+                    }
                 }
                 next();
+                return new StructLiteralAST(parts.getFirst(), values);
             }
+            // Not a struct: this `X{...}` is not valid
+            return error("Unknown struct: " + parts.getFirst());
         }
-        next();
-        return new CallExprAST(idName.toString(), args);
+
+        // function call: foo(...) or math.sqrt(...)
+        if (curTok == Lexer.Tokens.OPEN_PAR.value) {
+            next();
+            final List<ExprAST> args = new ArrayList<>();
+            if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
+                while (true) {
+                    final ExprAST arg = parseExpression();
+                    if (arg == null) return null;
+                    args.add(arg);
+                    if (curTok == Lexer.Tokens.CLOSE_PAR.value) break;
+                    if (curTok != Lexer.Tokens.PARAMS.value) {
+                        return error("Expected ')' or '|' in argument list in: " + fullName);
+                    }
+                    next();
+                }
+            }
+            next();
+            return new CallExprAST(fullName.toString(), args);
+        }
+
+        // no dot: plain variable
+        if (parts.size() == 1) {
+            return new VarRefExprAST(parts.getFirst());
+        }
+
+        // dotted: field access chain, e.g. p.x or p.inner.x
+        ExprAST current = new VarRefExprAST(parts.getFirst());
+        for (int i = 1; i < parts.size(); i++) {
+            current = new FieldAccessExprAST(current, parts.get(i));
+        }
+        return current;
     }
 
     /**
@@ -564,7 +663,7 @@ public final class Parser {
         next();
 
         // Parse type
-        final ZType varType = parseType(false);
+        final TypeRef varType = parseType(false);
         if (varType == null) {
             return error("Expected type in for");
         }
@@ -738,7 +837,9 @@ public final class Parser {
         } else if (token == Lexer.Tokens.BREAK || token == Lexer.Tokens.CONTINUE) {
             next();
             return new LoopJumpAST(token == Lexer.Tokens.BREAK);
-        } else if (isTypeToken(token)) {
+        } else if (isTypeToken(token)
+                || (token == Lexer.Tokens.IDENTIFIER
+                && StructRegistry.isStruct(lex.getIdentifierStr()))) {
             return parseVariable(false);
         } else if (token == Lexer.Tokens.CN) {
             return parseConstant();
@@ -849,7 +950,7 @@ public final class Parser {
         final List<PrototypeAST.Param> params = new ArrayList<>();
         if (curTok != Lexer.Tokens.CLOSE_PAR.value) {
             while (true) {
-                final ZType paramType = parseType(extern); // added support for varargs (only found in extern declaration)
+                final TypeRef paramType = parseType(extern); // added support for varargs (only found in extern declaration)
                 if (paramType == null) {
                     return error("Expected parameter type");
                 }
@@ -881,11 +982,13 @@ public final class Parser {
 
         next();
 
-        ZType returnType = null;
+        TypeRef returnType = null;
         if (!extern && curTok == Lexer.Tokens.ASSIGN.value) {
             next();
             final Lexer.Tokens retTok = Lexer.Tokens.fromValues(curTok);
-            if (!isTypeToken(retTok)) {
+            final boolean structName = retTok == Lexer.Tokens.IDENTIFIER
+                    && StructRegistry.isStruct(lex.getIdentifierStr());
+            if (!isTypeToken(retTok) && !structName) {
                 return error("Expected return type after '->', got " + describeToken(curTok) + " instead");
             }
             returnType = parseType(false);

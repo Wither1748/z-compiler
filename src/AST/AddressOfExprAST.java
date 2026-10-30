@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
 import src.Codegen.SymbolTable;
-import src.Parser.ZType;
+import src.Parser.TypeRef;
 
 /**
  * {@code &x}: the address of a variable.
@@ -27,7 +27,7 @@ public final class AddressOfExprAST extends ExprAST {
     }
 
     @Override
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         return operand.type(builder).pointerTo();
     }
 
@@ -47,6 +47,6 @@ public final class AddressOfExprAST extends ExprAST {
             builder.markFailed();
             return null;
         }
-        return new Value(info.getPointerReg(), info.getZType().pointerTo());
+        return new Value(info.getPointerReg(), info.getType().pointerTo());
     }
 }

@@ -30,7 +30,11 @@ final class Conditions {
 
             final ZType common;
             try {
-                common = ZType.unify(a.type(), b.type());
+                if (!(a.type() instanceof ZType za) || !(b.type() instanceof ZType zb)) {
+                    logger.error("Error: struct cannot be used in a comparison");
+                    return null;
+                }
+                common = ZType.unify(za, zb);
             } catch (final IllegalArgumentException e) {
                 logger.error("Error: {}", e.getMessage());
                 return null;

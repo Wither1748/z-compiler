@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import src.AST.*;
 import src.Parser.Parser;
 import src.Lexer.Lexer;
+import src.Parser.StructRegistry;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -97,6 +98,7 @@ public final class ModuleLoader {
 
 
     public static ModuleAST parseUnit(final Parser parser, final String moduleName) throws IOException {
+        StructRegistry.clear();
         final ModuleAST module = new ModuleAST(moduleName);
         boolean declarationsStarted = false;
 
@@ -124,6 +126,10 @@ public final class ModuleLoader {
                 final FunctionAST function = parser.parseDefinition();
                 if (function == null) return null;
                 module.addFunction(function);
+            } else if (token == Lexer.Tokens.STRUCT) {
+                final StructDeclAST struct = parser.parseStructDecl();
+                if (struct == null) return null;
+                // StructRegistry already holds the type; no need to store the AST
             } else if (parser.atTypeDeclaration()) {
                 final DeclaratorExprAST variable = parser.parseVariable(true);
                 if (variable == null) return null;

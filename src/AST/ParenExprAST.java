@@ -16,7 +16,7 @@ public final class ParenExprAST extends ExprAST {
     }
 
     @Override
-    public src.Parser.ZType type(final IRBuilder builder) {
+    public src.Parser.TypeRef type(final IRBuilder builder) {
         return inner.type(builder);
     }
 

@@ -3,6 +3,7 @@ package src.AST;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import src.Codegen.IRBuilder;
+import src.Parser.TypeRef;
 import src.Parser.ZType;
 
 /**
@@ -20,7 +21,7 @@ public final class AssignThroughPointerExprAST extends ExprAST {
     }
 
     @Override
-    public ZType type(final IRBuilder builder) {
+    public TypeRef type(final IRBuilder builder) {
         return ZType.VOID;
     }
 
@@ -31,7 +32,7 @@ public final class AssignThroughPointerExprAST extends ExprAST {
             builder.markFailed();
             return null;
         }
-        final ZType elem = ptr.type().elementType();
+        final TypeRef elem = ptr.type().elementType();
         if (elem == null) {
             logger.error("Error: '*' needs a typed pointer, got {}", ptr.type().zName());
             builder.markFailed();
